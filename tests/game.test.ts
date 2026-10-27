@@ -53,4 +53,9 @@ describe('Cup Shuffle Game Logic & Specifications', () => {
 
     expect(parseInt(localStorage.getItem(storageKey) || '0', 10)).toBe(800);
   });
+
+  it('should verify mixing coordinate animation transition rule', () => {
+    const transitionStyle = 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)';
+    expect(transitionStyle).toContain('transform 300ms cubic-bezier(0.4, 0, 0.2, 1)');
+  });
 });

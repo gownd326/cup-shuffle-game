@@ -51,7 +51,7 @@ export default function GameBoard({
         </h2>
       </div>
 
-      <div className="flex flex-wrap justify-center gap-4 sm:gap-6 my-8 min-h-[140px] sm:min-h-[160px] items-center w-full">
+      <div className="flex justify-center gap-4 my-8 relative h-32 items-center w-full overflow-hidden px-4">
         {displayCups.map((cupOriginalId, visualIdx) => {
           const hasBall = cupOriginalId === ballIndex;
           const isSelected = selectedCupIndex === cupOriginalId;
@@ -75,7 +75,7 @@ export default function GameBoard({
         <div className="mt-6">
           <button
             onClick={onGameStart}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg transform active:scale-95 transition duration-200 text-lg"
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform active:scale-95 transition duration-200 text-lg cursor-pointer"
           >
             {gameState === 'IDLE' ? '게임 시작' : '다시 하기'}
           </button>
