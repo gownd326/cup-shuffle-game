@@ -23,15 +23,15 @@ export default function GameBoard({
   onCupClick,
   onGameStart,
 }: GameBoardProps) {
-  // Determine status text based on gameState
+  // Determine status text based on gameState according to SPEC
   const getStatusText = () => {
     switch (gameState) {
       case 'IDLE':
-        return '시작 버튼을 눌러 게임을 시작하세요!';
+        return '공의 위치를 눈여겨보세요!';
       case 'PREVIEW':
-        return '공의 위치를 기억하세요!';
+        return '공의 위치를 눈여겨보세요!';
       case 'MIXING':
-        return '섞는 중...';
+        return '컵이 섞이는 중입니다... 눈으로 쫓아가세요!';
       case 'CHOOSING':
         return '공이 숨겨진 컵을 선택하세요!';
       case 'ROUND_CLEAR':
@@ -44,14 +44,14 @@ export default function GameBoard({
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center p-6 bg-slate-800 rounded-2xl shadow-xl border border-slate-700">
-      <div className="mb-8 text-center min-h-[3rem] flex items-center justify-center">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-100 transition-all duration-300">
+    <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center p-6 bg-slate-800 rounded-2xl shadow-xl border border-slate-700">
+      <div className="mb-6 text-center min-h-[3rem] flex items-center justify-center">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-100 transition-all duration-300">
           {getStatusText()}
         </h2>
       </div>
 
-      <div className="flex justify-center gap-4 my-8 relative h-32 items-center w-full overflow-hidden px-4">
+      <div className="flex justify-center gap-6 my-12 relative h-40 w-full max-w-xl mx-auto overflow-hidden px-4 items-center">
         {displayCups.map((cupOriginalId, visualIdx) => {
           const hasBall = cupOriginalId === ballIndex;
           const isSelected = selectedCupIndex === cupOriginalId;
@@ -72,7 +72,7 @@ export default function GameBoard({
       </div>
 
       {(gameState === 'IDLE' || gameState === 'GAME_OVER') && (
-        <div className="mt-6">
+        <div className="mt-4">
           <button
             onClick={onGameStart}
             className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform active:scale-95 transition duration-200 text-lg cursor-pointer"

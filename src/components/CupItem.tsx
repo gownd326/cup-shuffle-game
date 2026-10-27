@@ -73,7 +73,7 @@ export default function CupItem({
       ref={itemRef}
       style={{
         transform: `translateX(${translateX}px)`,
-        transition: gameState === 'MIXING' ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+        transition: gameState === 'MIXING' ? 'transform 350ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
       }}
       className="flex flex-col items-center relative"
     >
@@ -94,14 +94,14 @@ export default function CupItem({
           type="button"
           disabled={gameState !== 'CHOOSING'}
           onClick={onClick}
-          className={`relative z-10 w-20 h-24 sm:w-24 sm:h-28 bg-gradient-to-b from-slate-700 to-slate-800 border-2 ${
+          className={`relative z-10 w-20 h-24 sm:w-24 sm:h-28 bg-amber-600 border-2 border-amber-400 ${
             isSelected && isIncorrect
               ? 'border-red-500 bg-red-950/40'
               : isSelected && !isIncorrect && gameState === 'ROUND_CLEAR'
               ? 'border-green-500 bg-green-950/40'
-              : 'border-slate-600 hover:border-orange-500'
-          } rounded-t-2xl rounded-b-lg shadow-xl flex flex-col items-center justify-center transform transition-all duration-300 ${cupTransform} ${
-            gameState === 'CHOOSING' ? 'cursor-pointer hover:-translate-y-2 hover:shadow-orange-500/25' : 'cursor-default pointer-events-none'
+              : 'hover:border-amber-300'
+          } rounded-t-full shadow-xl flex flex-col items-center justify-center transform transition-all duration-200 ${cupTransform} ${
+            gameState === 'CHOOSING' ? 'cursor-pointer hover:-translate-y-3' : 'cursor-default pointer-events-none'
           }`}
         >
           <span className="text-3xl sm:text-4xl select-none">🥤</span>

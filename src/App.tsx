@@ -29,13 +29,13 @@ export default function App() {
     }
   }, []);
 
-  // Determine level configuration
+  // Determine level configuration according to SPEC
   const getLevelConfig = (lvl: number): LevelConfig => {
-    if (lvl === 1) return { cups: 3, shuffleCount: 4, speed: 500 };
-    if (lvl === 2) return { cups: 3, shuffleCount: 6, speed: 400 };
-    if (lvl === 3) return { cups: 4, shuffleCount: 7, speed: 350 };
-    if (lvl === 4) return { cups: 4, shuffleCount: 9, speed: 300 };
-    return { cups: 5, shuffleCount: 10 + (lvl - 5), speed: 250 };
+    if (lvl === 1) return { cups: 3, shuffleCount: 4, speed: 700 };
+    if (lvl === 2) return { cups: 3, shuffleCount: 6, speed: 600 };
+    if (lvl === 3) return { cups: 4, shuffleCount: 7, speed: 500 };
+    if (lvl === 4) return { cups: 4, shuffleCount: 9, speed: 400 };
+    return { cups: 5, shuffleCount: 10 + (lvl - 5), speed: 350 };
   };
 
   // Initialize round cups
@@ -63,14 +63,13 @@ export default function App() {
     setSelectedCupIndex(null);
     setIsIncorrect(false);
 
-    // PREVIEW state
+    // PREVIEW state (1.5 seconds per SPEC)
     setGameState('PREVIEW');
 
-    // After 1 second preview, start mixing
     setTimeout(() => {
       setGameState('MIXING');
       executeShuffles(config.shuffleCount, config.speed, newCupCount, correctCup);
-    }, 1000);
+    }, 1500);
   }, [level, initRoundCups]);
 
   const handleGameStart = () => {
@@ -79,7 +78,7 @@ export default function App() {
     startRound();
   };
 
-  // Execute shuffle animation sequence
+  // Execute shuffle animation sequence with 200ms pause per step
   const executeShuffles = (totalShuffles: number, speed: number, currentCupCount: number, initialBallPos: number) => {
     let currentStep = 0;
     let currentBallPos = initialBallPos;
@@ -87,7 +86,6 @@ export default function App() {
 
     const stepShuffle = () => {
       if (currentStep < totalShuffles) {
-        // Pick two distinct random cups to swap
         let idx1 = Math.floor(Math.random() * currentCupCount);
         let idx2 = Math.floor(Math.random() * currentCupCount);
         while (idx2 === idx1 || (currentCupCount > 2 && idx1 === lastPair[1] && idx2 === lastPair[0])) {
@@ -103,7 +101,6 @@ export default function App() {
           return next;
         });
 
-        // Track ball movement if involved in swap
         if (currentBallPos === idx1) {
           currentBallPos = idx2;
         } else if (currentBallPos === idx2) {
@@ -112,15 +109,16 @@ export default function App() {
 
         playSound('shuffle');
         currentStep++;
-        shuffleTimerRef.current = setTimeout(stepShuffle, speed);
+
+        // speed + 200ms pause interval per SPEC
+        shuffleTimerRef.current = setTimeout(stepShuffle, speed + 200);
       } else {
-        // Mixing finished, transition to CHOOSING
         setBallIndex(currentBallPos);
         setGameState('CHOOSING');
       }
     };
 
-    shuffleTimerRef.current = setTimeout(stepShuffle, speed);
+    shuffleTimerRef.current = setTimeout(stepShuffle, speed + 200);
   };
 
   // Handle cup selection by user
@@ -134,20 +132,18 @@ export default function App() {
       playSound('correct');
       setGameState('ROUND_CLEAR');
 
-      // Calculate score
+      // Score formula: (현재 레벨 × 100) + (잔여 컵 개수 × 50) + (난이도 보너스)
       const config = getLevelConfig(level);
-      const bonus = level * 10;
+      const bonus = level * 20;
       const roundScoreEarned = (level * 100) + (config.cups * 50) + bonus;
       const newScore = score + roundScoreEarned;
       setScore(newScore);
 
-      // Check best score update immediately
       if (newScore > bestScore) {
         setBestScore(newScore);
         localStorage.setItem('cup_game_best_score', newScore.toString());
       }
 
-      // Proceed to next level after 1 second
       setTimeout(() => {
         setLevel((prev) => prev + 1);
         startRound();
@@ -157,7 +153,6 @@ export default function App() {
       setIsIncorrect(true);
       setGameState('GAME_OVER');
 
-      // Final best score check
       if (score > bestScore) {
         setBestScore(score);
         localStorage.setItem('cup_game_best_score', score.toString());
