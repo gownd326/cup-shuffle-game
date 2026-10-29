@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 화면·UI 설계
 
-> 문서 버전 v9 · 완성도 100% · 마지막 수정 2026. 10. 29. 12시 38분 8초
+> 문서 버전 v11 · 완성도 100% · 마지막 수정 2026. 10. 29. 12시 40분 48초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -18,33 +18,40 @@
 ### 1. 화면 구성
 - **단일 페이지 앱 (SPA)** 구조로 `/` 경로 하나에서 상태에 따라 화면 요소가 변경됨.
 
-### 2. UI 레이아웃 및 텍스트
+### 2. UI 레이아웃 및 텍스트 (아기자기한 스타일 적용)
 - **상단 헤더**: 
-  - 타이틀: `🥤 컵 섞기 야바위` (폰트 크기 `text-2xl font-bold text-white`)
-  - 점수판: `현재 점수: {score}` | `최고 점수: {bestScore}` | `레벨: {level}`
+  - 타이틀: `✨ 알록달록 컵 섞기 대작전 ✨` (폰트 크기 `text-3xl font-extrabold text-pink-500 drop-shadow-sm`)
+  - 점수판 카드: `bg-white/80 backdrop-blur-md shadow-md rounded-2xl p-4 flex gap-6 text-slate-700 font-semibold border border-pink-100` (현재 점수, 최고 점수, 레벨 표시)
 - **중앙 플레이 영역**:
-  - 안내 문구 (`statusText`): 상태에 따라 "공의 위치를 눈여겨보세요!", "컵이 섞이는 중입니다... 눈으로 쫓아가세요!", "공이 숨겨진 컵을 선택하세요!", "정답입니다! 다음 레벨로...", "게임 오버!" 표시
-  - 컵 그리드 컨테이너: `relative h-48 w-full max-w-xl mx-auto flex items-center justify-center overflow-hidden`
-  - 컵 아이템 (`CupItem`): 절대 위치 혹은 `translateX` 기반 레이아웃으로, `transition-transform`이 원활히 동작하도록 고정 폭(`w-24`)과 마진 부여. 섞이는 동안 겹치지 않고 정확히 좌우로 교차 이동하는 궤적 시각화.
+  - 안내 문구 (`statusText`): 말풍선 형태의 디자인(`bg-white border-2 border-pink-200 rounded-2xl px-6 py-3 text-pink-600 font-bold shadow-sm mb-6`)으로 상태 표시 ("공이 숨겨진 컵을 눈여겨보세요!", "샤샥- 섞이는 중! 눈을 떼지 마세요!", "어느 컵에 들어있을까요? 꾹 눌러보세요!")
+  - 컵 그리드 컨테이너: `relative h-56 w-full max-w-xl mx-auto flex items-center justify-center overflow-hidden bg-white/50 rounded-3xl border border-pink-100 shadow-inner p-4`
+  - 컵 아이템 (`CupItem`): 파스텔톤 컬러의 둥근 컵 디자인(이모지 🥤 및 귀여운 파스텔 배경), 튀어오르는 호버 애니메이션(`hover:-translate-y-2 transition-transform duration-200`).
 - **하단 액션 영역**:
-  - `IDLE` / `GAME_OVER` 상태: `게임 시작` 또는 `다시 하기` 버튼 (`bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg`)
+  - `IDLE` / `GAME_OVER` 상태: 귀여운 핑크/퍼플 그라데이션 버튼 (`bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-4 px-8 rounded-full shadow-lg shadow-pink-300/50 text-lg transform active:scale-95 transition-all`)
 
 ## 2. 디자인 가이드
 
-### 1. 컬러 팔레트 (Tailwind 기준)
-- 배경색: `bg-slate-900` (`#0F172A`)
-- 카드/패널 배경: `bg-slate-800` (`#1E293B`)
-- 강조 색상 (오렌지): `bg-orange-500` (`#F97316`), 호버 시 `bg-orange-600` (`#EA580C`)
-- 텍스트 기본: `text-slate-100` (`#F1F5F9`)
-- 텍스트 보조: `text-slate-400` (`#94A3B8`)
+### 1. 아기자기한 컬러 팔레트 (Tailwind 기준)
+- 배경색 (파스텔 그라데이션): `bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100` (`#FCE7F3`, `#F3E8FF`, `#E0F2FE`)
+- 카드/패널 배경: 화이트 계열 반투명 `bg-white/80 backdrop-blur-md border border-pink-100`
+- 강조 색상 (귀여운 핑크/퍼플): 메인 버튼 `bg-pink-400 hover:bg-pink-500` (`#F472B6`), 보조 버튼 `bg-purple-400 hover:bg-purple-500` (`#C084FC`)
+- 텍스트 기본: 진한 보라/회색 `text-slate-700` (`#334155`)
+- 텍스트 보조: `text-slate-500` (`#64748B`)
 
-### 2. 타이포그래피
-- 폰트 가족: 시스템 기본 산세리프 (`font-sans`, Pretendard 우선 적용)
+### 2. 컴포넌트 스타일 규칙
+- **모서리(Border-radius)**: 모든 카드, 버튼, 팝업창은 둥글둥글하게 처리 (`rounded-2xl`, `rounded-full` 적극 활용).
+- **그림자 및 입체감**: 부드러운 그림자(`shadow-lg`, `shadow-pink-200/50`)를 주어 몽글몽글한 느낌 연출.
+- **아이콘 및 이모지**: 알록달록한 컵 이모지(🥤, ☕ 등)와 파스텔 컬러 원형 배경을 조합한 귀여운 컵 디자인 적용.
+
+### 3. 타이포그래피
+- 폰트 가족: 둥근고딕 계열의 시스템 폰트 우선 적용 (`font-sans`, 둥근 느낌의 Sans-serif).
 
 ## 변경 이력
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v11 | 2026. 10. 29. 12시 40분 33초 | 최종 감수: 디자인을 아기자기하고 귀여운 파스텔톤 스타일로 전면 개편하고, 컵 섞기 야바위 게임의 모든 기능 명세, 화면 레이아웃, 데이터 및 테스트 시나리오를 최종 감수하여 완성했습니다. |
+| v10 | 2026. 10. 29. 12시 40분 25초 | 야바위 게임의 디자인을 아기자기하고 귀여운 스타일(파스텔톤 배경, 둥근 모서리, 귀여운 폰트 및 이모지/애니메이션 감성)으로 전면 개편합니다. |
 | v9 | 2026. 10. 29. 12시 37분 18초 | 컵이 멈춰있던 문제를 해결하기 위해 React 상태와 절대 좌표(translateX) 기반의 컵 이동 애니메이션 로직을 전면 재구축하고, 시각적 추적 과정을 명확히 보완함. |
 | v8 | 2026. 10. 27. 15시 50분 18초 | 최종 감수: 컵 이동 애니메이션이 보이지 않는 문제를 해결하기 위해 CSS transform 기반의 스왑 애니메이션 및 타이밍 규칙을 기능 명세, 화면 명세, 테스트 계획에 구체적으로 보강하였습니다. |
 | v7 | 2026. 10. 27. 15시 50분 13초 | 컵이 이동하는 궤적과 애니메이션이 확실히 보이도록 CSS transform과 swap 순서 로직을 구체화하고 관련 문서 내용을 보강했습니다. |

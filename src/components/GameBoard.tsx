@@ -23,19 +23,19 @@ export default function GameBoard({
   onCupClick,
   onGameStart,
 }: GameBoardProps) {
-  // Determine status text based on gameState according to SPEC
+  // Status text matching SPEC
   const getStatusText = () => {
     switch (gameState) {
       case 'IDLE':
-        return '공의 위치를 눈여겨보세요!';
+        return '공이 숨겨진 컵을 눈여겨보세요!';
       case 'PREVIEW':
-        return '공의 위치를 눈여겨보세요!';
+        return '공이 숨겨진 컵을 눈여겨보세요!';
       case 'MIXING':
-        return '컵이 섞이는 중입니다... 눈으로 쫓아가세요!';
+        return '샤샥- 섞이는 중! 눈을 떼지 마세요!';
       case 'CHOOSING':
-        return '공이 숨겨진 컵을 선택하세요!';
+        return '어느 컵에 들어있을까요? 꾹 눌러보세요!';
       case 'ROUND_CLEAR':
-        return '정답입니다! 다음 레벨로...';
+        return '정답입니다! 다음 라운드로...';
       case 'GAME_OVER':
         return '게임 오버!';
       default:
@@ -44,14 +44,14 @@ export default function GameBoard({
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center p-6 bg-slate-800 rounded-2xl shadow-xl border border-slate-700">
-      <div className="mb-6 text-center min-h-[3rem] flex items-center justify-center">
-        <h2 className="text-lg sm:text-xl font-bold text-slate-100 transition-all duration-300">
+    <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center">
+      <div className="mb-6 text-center flex items-center justify-center">
+        <div className="bg-white border-2 border-pink-200 rounded-2xl px-6 py-3 text-pink-600 font-bold shadow-sm transition-all duration-300">
           {getStatusText()}
-        </h2>
+        </div>
       </div>
 
-      <div className="flex justify-center gap-6 my-12 relative h-40 w-full max-w-xl mx-auto overflow-hidden px-4 items-center">
+      <div className="relative h-56 w-full max-w-xl mx-auto flex items-center justify-center overflow-hidden bg-white/50 rounded-3xl border border-pink-100 shadow-inner p-4 gap-6">
         {displayCups.map((cupOriginalId, visualIdx) => {
           const hasBall = cupOriginalId === ballIndex;
           const isSelected = selectedCupIndex === cupOriginalId;
@@ -72,10 +72,10 @@ export default function GameBoard({
       </div>
 
       {(gameState === 'IDLE' || gameState === 'GAME_OVER') && (
-        <div className="mt-4">
+        <div className="mt-8">
           <button
             onClick={onGameStart}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform active:scale-95 transition duration-200 text-lg cursor-pointer"
+            className="bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-4 px-8 rounded-full shadow-lg shadow-pink-300/50 text-lg transform active:scale-95 transition-all cursor-pointer"
           >
             {gameState === 'IDLE' ? '게임 시작' : '다시 하기'}
           </button>

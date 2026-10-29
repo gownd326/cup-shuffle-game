@@ -8,20 +8,20 @@ interface HeaderProps {
 
 export default function Header({ score, bestScore, level }: HeaderProps) {
   return (
-    <header className="w-full bg-slate-800 border-b border-slate-700 py-4 px-6 shadow-md">
+    <header className="w-full py-6 px-6">
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <span>🥤</span> 컵 섞기 야바위
+        <h1 className="text-3xl font-extrabold text-pink-500 drop-shadow-sm flex items-center gap-2">
+          ✨ 알록달록 컵 섞기 대작전 ✨
         </h1>
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-sm sm:text-base font-medium">
-          <div className="bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
-            <span className="text-slate-400">현재 점수:</span> <span className="text-orange-400 font-bold">{score}</span>
+        <div className="bg-white/80 backdrop-blur-md shadow-md rounded-2xl p-4 flex gap-6 text-slate-700 font-semibold border border-pink-100 text-sm sm:text-base">
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">현재 점수:</span> <span className="text-pink-500 font-bold">{score}</span>
           </div>
-          <div className="bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
-            <span className="text-slate-400">최고 점수:</span> <span className="text-yellow-400 font-bold">{bestScore}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">최고 점수:</span> <span className="text-purple-500 font-bold">{bestScore}</span>
           </div>
-          <div className="bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
-            <span className="text-slate-400">레벨:</span> <span className="text-blue-400 font-bold">{level}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">레벨:</span> <span className="text-sky-600 font-bold">{level}</span>
           </div>
         </div>
       </div>
