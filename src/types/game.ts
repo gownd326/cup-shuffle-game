@@ -20,3 +20,11 @@ export interface LevelConfig {
   swapDuration: number;
   stepDelay: number;
 }
+
+export interface ScoreRecord {
+  id: string;
+  nickname: string;
+  score: number;
+  level: number;
+  created_at: string;
+}

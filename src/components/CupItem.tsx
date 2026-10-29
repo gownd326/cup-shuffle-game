@@ -23,7 +23,6 @@ export default function CupItem({
   const isChoosing = gameState === 'CHOOSING';
   const isMixing = gameState === 'MIXING';
 
-  // Transform coordinates per SPEC:
   // slotIndex * slotWidth, yOffset (-30px, +30px, 0px)
   const x = cup.slotIndex * slotWidth;
   const y = cup.yOffset;
@@ -36,7 +35,7 @@ export default function CupItem({
         left: 0,
         transform: `translate3d(${x}px, ${y}px, 0)`,
         transition: isMixing
-          ? `transform ${swapDuration}ms cubic-bezier(0.25, 1, 0.5, 1)`
+          ? `transform ${swapDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`
           : 'transform 300ms ease-out',
         zIndex: cup.zIndex,
       }}
@@ -61,10 +60,10 @@ export default function CupItem({
         )}
       </div>
 
-      {/* Cup Graphic (lifts up by 45px when isOpen) */}
+      {/* Cup Graphic (lifts up by 50px per SPEC when open/preview) */}
       <div
         style={{
-          transform: isOpen ? 'translateY(-45px)' : 'translateY(0px)',
+          transform: isOpen ? 'translateY(-50px)' : 'translateY(0px)',
           transition: 'transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
         className="absolute bottom-3 flex flex-col items-center"

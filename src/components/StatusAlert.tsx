@@ -17,7 +17,7 @@ export default function StatusAlert({ gameState }: StatusAlertProps) {
       case 'ROUND_CLEAR':
         return '정답입니다! 다음 라운드로 출발! 🎉';
       case 'GAME_OVER':
-        return '아쉽네요! 다시 도전해볼까요? 😢';
+        return '아쉽네요! 점수를 등록하고 전 세계 랭킹을 확인해보세요! 😢';
       case 'REVEAL':
         return '공이 들어있는 컵을 확인하는 중... 🔍';
       case 'IDLE':

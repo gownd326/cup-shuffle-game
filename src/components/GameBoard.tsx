@@ -33,7 +33,6 @@ export default function GameBoard({
       const count = Math.max(cups.length, 3);
       const cupWidth = window.innerWidth < 640 ? 80 : 96;
 
-      // Calculate slotWidth to distribute cups evenly inside container
       const availableWidth = containerWidth - 48; // padding
       const computedSlot = Math.floor((availableWidth - cupWidth) / (count - 1));
       const clamped = Math.max(76, Math.min(110, computedSlot));
@@ -49,11 +48,14 @@ export default function GameBoard({
   const cupWidth = typeof window !== 'undefined' && window.innerWidth < 640 ? 80 : 96;
   const trackTotalWidth = (cupCount - 1) * slotWidth + cupWidth;
 
+  const isMixing = gameState === 'MIXING';
+
   return (
-    <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center">
+    <div className="w-full max-w-[600px] mx-auto flex flex-col items-center justify-center">
       {/* Stage Container */}
       <div
         ref={containerRef}
+        style={{ pointerEvents: isMixing ? 'none' : 'auto' }}
         className="relative h-64 w-full flex items-center justify-center bg-white/60 rounded-3xl border-2 border-pink-100 p-6 shadow-inner overflow-hidden"
       >
         {/* Track Area where absolute cups slide */}
@@ -81,15 +83,15 @@ export default function GameBoard({
         </div>
       </div>
 
-      {/* Action Button: Visible during IDLE or GAME_OVER */}
-      {(gameState === 'IDLE' || gameState === 'GAME_OVER') && (
+      {/* Action Button: Visible during IDLE */}
+      {gameState === 'IDLE' && (
         <div className="mt-8">
           <button
             type="button"
             onClick={onGameStart}
             className="bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-4 px-8 rounded-full shadow-lg shadow-pink-300/50 text-lg transform active:scale-95 transition-all cursor-pointer"
           >
-            {gameState === 'IDLE' ? '게임 시작' : '다시 하기'}
+            게임 시작
           </button>
         </div>
       )}

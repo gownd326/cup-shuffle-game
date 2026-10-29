@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 기술·데이터 설계
 
-> 문서 버전 v15 · 완성도 100% · 마지막 수정 2026. 10. 29. 13시 16분 5초
+> 문서 버전 v18 · 완성도 100% · 마지막 수정 2026. 10. 29. 13시 53분 16초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -10,25 +10,50 @@
 | 사이트 이름 | 컵 섞기 야바위 게임 |
 | 영문 식별자(slug) | cup-shuffle-game |
 | 개발 방식(framework) | vite |
-| 데이터베이스 사용 | 아니오 |
+| 데이터베이스 사용 | 예 (Supabase) |
 | 배포 | GitHub → Vercel (무료) |
 
 ## 1. 데이터 모델
 
-### 1. 로컬 저장소 (LocalStorage)
-- **키 명칭**: `cup_game_best_score`
-- **데이터 타입**: `number`
-- **읽기/쓰기 규칙**:
-  - 앱 최초 진입 시 `localStorage.getItem('cup_game_best_score')`를 호출하여 숫자로 파싱 (없거나 NaN일 경우 `0` 반환).
-  - 게임 오버 시 `score > bestScore`인 경우 `localStorage.setItem('cup_game_best_score', score.toString())` 실행.
+### 1. 데이터베이스 스키마 (Supabase PostgreSQL)
+- **테이블명**: `game_scores`
+- **컬럼 정의**:
+
+| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, `default: gen_random_uuid()` | 고유 식별자 |
+| `nickname` | `text` | NOT NULL, `length(nickname) between 2 and 8` | 플레이어 닉네임 |
+| `score` | `integer` | NOT NULL, `check: score >= 0` | 최종 획득 점수 |
+| `level` | `integer` | NOT NULL, `default: 1` | 도달한 최종 레벨 |
+| `created_at` | `timestamptz` | NOT NULL, `default: now()` | 점수 기록 일시 |
+
+### 2. 행 수준 보안 (RLS: Row Level Security) 정책
+- RLS 활성화: `ALTER TABLE game_scores ENABLE ROW LEVEL SECURITY;`
+- **읽기 정책 (모든 유저 공개 조회)**:
+  ```sql
+  CREATE POLICY "Allow public read on game_scores"
+  ON game_scores FOR SELECT
+  USING (true);
+  ```
+- **쓰기 정책 (누구나 점수 등록 가능)**:
+  ```sql
+  CREATE POLICY "Allow public insert on game_scores"
+  ON game_scores FOR INSERT
+  WITH CHECK (true);
+  ```
+
+### 3. 순위 조회 쿼리
+- TOP 5 조회: `SELECT * FROM game_scores ORDER BY score DESC, created_at ASC LIMIT 5;`
+- 전체 최고 점수 조회: `SELECT score FROM game_scores ORDER BY score DESC LIMIT 1;`
 
 ## 2. 기술 스택과 폴더 구조
 
 ### 1. 기술 스택
 - 프레임워크: Vite + React 18 (TypeScript)
-- 스타일링: Tailwind CSS (파스텔 테마 및 CSS 애니메이션 유틸리티)
+- 백엔드 / 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
+- 스타일링: Tailwind CSS (파스텔 테마 및 CSS Transform 애니메이션)
 - 사운드: Web Audio API (외부 파일 로딩 의존성 없는 자체 신디사이저 비프음 및 효과음 구현)
-- 아이콘: Lucide React (트로피, 별, 리셋 아이콘 등)
+- 아이콘: Lucide React (Trophy, RefreshCw, Star 등)
 
 ### 2. 프로젝트 디렉토리 구조
 ```text
@@ -38,41 +63,54 @@ cup-shuffle-game/
 ├── tsconfig.json
 ├── vite.config.ts
 ├── tailwind.config.js
+├── .env.example
 └── src/
     ├── main.tsx
     ├── App.tsx
     ├── index.css
+    ├── lib/
+    │   └── supabase.ts     # Supabase 클라이언트 인스턴스 초기화
     ├── types/
-    │   └── game.ts         # GameState, CupItem, LevelConfig 타입 정의
+    │   └── game.ts         # GameState, CupItem, LevelConfig, ScoreRecord 타입
     ├── constants/
-    │   └── levels.ts       # 레벨별 속도, 컵 개수, 섞기 횟수 상수 테이블
+    │   └── levels.ts       # 레벨별 속도, 컵 개수, 섞기 횟수 테이블
     ├── utils/
-    │   ├── sound.ts        # Web Audio API 톤 생성기 (정답, 땡, 섞기 틱음)
+    │   ├── sound.ts        # Web Audio API 톤 생성기
     │   └── timer.ts        # sleep 비동기 헬퍼
     └── components/
-        ├── Header.tsx       # 점수, 레벨, 최고점수 현황판
-        ├── StatusAlert.tsx  # 현재 게임 상태 말풍선 안내
-        ├── GameBoard.tsx    # 컵 트랙 및 섞기 루프 제어 컴포넌트
-        ├── CupItem.tsx      # 개별 컵 그래픽, transform 애니메이션 및 공 렌더러
-        └── GameOverModal.tsx# 게임 종료 팝업 및 다시 시작 버튼
+        ├── Header.tsx           # 점수, 레벨, 최고점수 헤더
+        ├── StatusAlert.tsx      # 현재 게임 상태 말풍선
+        ├── GameBoard.tsx        # 컵 트랙 및 위치 교환 애니메이션 제어
+        ├── CupItem.tsx          # 100% 동일한 외관의 컵 카드 그래픽 컴포넌트
+        ├── GameOverModal.tsx    # 점수 확인 및 닉네임 등록 팝업
+        └── LeaderboardModal.tsx # 실시간 Supabase TOP 5 리더보드 모달
 ```
 
 ### 3. 환경 변수
-- 순수 클라이언트 단독 프론트엔드 게임이므로 환경 변수(`.env`)가 필요하지 않음.
+- `VITE_SUPABASE_URL`: Supabase 프로젝트 URL
+- `VITE_SUPABASE_ANON_KEY`: Supabase 공개 Anon Key
 
 ## 3. 품질 기준 (성능·보안·접근성)
 
-### 1. 성능
-- 초기 로딩 속도 1초 이내 (Vite 빌드 최적화)
-- 애니메이션 프레임 60fps 유지 (CSS Transform 활용)
+### 1. 성능 및 애니메이션 안정성
+- **부드러운 컵 이동 보장**: DOM 요소를 재배치(재마운트)하지 않고, 고유 key를 부여한 뒤 CSS `transform` 속성(`translateX`)만 변경하여 브라우저의 리플로우(Reflow)를 방지하고 60fps 부드러운 궤적 이동 보장.
+- **중복 입력 방지**: `MIXING` 단계에서는 스테이지 전체에 `pointer-events: none`을 부여하여 사용자의 의도치 않은 터치 인터럽트 방지.
 
-### 2. 반응형
-- 스마트폰 세로 모드 및 태블릿/PC 환경에서 컵이 화면 중앙에 정렬되도록 레이아웃 구성
+### 2. 네트워크 및 Supabase 장애 대비 (폴백 메커니즘)
+- Supabase 연결 실패 또는 네트워크 오류 발생 시 게임 플레이가 중단되지 않도록 로컬스토리지(`localStorage.getItem('cup_best_score')`)에 최고 점수를 자동 백업 저장.
+- 랭킹 불러오기 실패 시 친절한 안내 메시지("랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")와 '재시도' 버튼 노출.
+
+### 3. 모바일/터치 접근성
+- 컵 카드의 최소 터치 영역을 80px × 110px 이상 확보하여 스마트폰 터치 오동작 방지.
+- 가로 스크롤 방지(`overflow-x-hidden`) 및 모바일 세로 뷰에 맞춰 컵 간격 자동 축소(CSS Flex / Grid gap 조절).
 
 ## 변경 이력
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v18 | 2026. 10. 29. 13시 41분 21초 | 최종 감수: 최종 개발을 위해 컵 이동 애니메이션 기술 명세(슬롯 기반 좌표 전환)와 에러 대응 품질 기준을 보강하고 개발 착수 상태로 전환했습니다. |
+| v17 | 2026. 10. 29. 13시 39분 51초 | 온라인 실시간 랭킹 시스템을 위한 Supabase DB 연동 규격 및 게임 오버 시 닉네임 등록 플로우 반영 |
+| v16 | 2026. 10. 29. 13시 26분 17초 | 플레이어 닉네임 입력 및 TOP 5 리더보드(명예의 전당) 기록·경쟁 기능 요구사항 반영 |
 | v15 | 2026. 10. 29. 13시 11분 25초 | 최종 감수: 최종 개발 착수를 위한 전체 문서 감수 완료 (제목 및 컵 카드 통일성 정합성 일치, 테스트 및 아키텍처 완성도 100% 검증) |
 | v14 | 2026. 10. 29. 13시 7분 29초 | 야바위 게임 특성에 맞춰 모든 컵 카드의 배경색 및 외관 스타일을 완벽히 동일한 단일 색상으로 통일 |
 | v13 | 2026. 10. 29. 12시 53분 56초 | 최종 감수: 컵 섞기 애니메이션이 브라우저에서 확실하게 보이도록 DOM 배치 및 CSS 트랜지션 타이밍 규칙을 극대화하고 개발 시작 가능한 최종 감수 완료 |
