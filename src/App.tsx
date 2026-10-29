@@ -1,187 +1,237 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from './components/Header';
+import StatusAlert from './components/StatusAlert';
 import GameBoard from './components/GameBoard';
 import GameOverModal from './components/GameOverModal';
-import { GameState, LevelConfig } from './types/game';
+import { GameState, CupItemData } from './types/game';
+import {
+  getLevelConfig,
+  calculateRoundScore,
+  CUP_COLOR_PALETTES,
+} from './constants/levels';
 import { playSound } from './utils/sound';
+import { sleep } from './utils/timer';
+
+const BEST_SCORE_STORAGE_KEY = 'cup_game_best_score';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('IDLE');
   const [score, setScore] = useState<number>(0);
   const [bestScore, setBestScore] = useState<number>(0);
   const [level, setLevel] = useState<number>(1);
-  const [cupCount, setCupCount] = useState<number>(3);
-  const [ballIndex, setBallIndex] = useState<number>(0);
-  const [selectedCupIndex, setSelectedCupIndex] = useState<number | null>(null);
-  const [isIncorrect, setIsIncorrect] = useState<boolean>(false);
-  const [displayCups, setDisplayCups] = useState<number[]>([]);
 
-  const shuffleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cup state managed without reordering the array, only updating slotIndex and yOffset
+  const [cups, setCups] = useState<CupItemData[]>([]);
+  const [ballCupId, setBallCupId] = useState<string>('cup-0');
+  const [revealedCupIds, setRevealedCupIds] = useState<string[]>([]);
+  const [currentSwapDuration, setCurrentSwapDuration] = useState<number>(750);
 
-  // Load best score on mount
+  // Active run cancel guard
+  const isPlayingRef = useRef<boolean>(false);
+
+  // Load best score on initial mount
   useEffect(() => {
-    const saved = localStorage.getItem('cup_game_best_score');
-    if (saved) {
-      const parsed = parseInt(saved, 10);
-      if (!isNaN(parsed)) {
-        setBestScore(parsed);
+    try {
+      const saved = localStorage.getItem(BEST_SCORE_STORAGE_KEY);
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          setBestScore(parsed);
+        }
       }
+    } catch {
+      // Storage unavailable fallback
     }
   }, []);
 
-  // Determine level configuration according to SPEC
-  const getLevelConfig = (lvl: number): LevelConfig => {
-    if (lvl === 1) return { cups: 3, shuffleCount: 4, speed: 700 };
-    if (lvl === 2) return { cups: 3, shuffleCount: 6, speed: 600 };
-    if (lvl === 3) return { cups: 4, shuffleCount: 7, speed: 500 };
-    if (lvl === 4) return { cups: 4, shuffleCount: 9, speed: 400 };
-    return { cups: 5, shuffleCount: 10 + (lvl - 5), speed: 350 };
-  };
-
-  // Initialize round cups
-  const initRoundCups = useCallback((count: number) => {
-    return Array.from({ length: count }, (_, i) => i);
+  // Initialize cup objects according to count
+  const createCupList = useCallback((count: number): CupItemData[] => {
+    return Array.from({ length: count }, (_, idx) => ({
+      id: `cup-${idx}`,
+      slotIndex: idx,
+      yOffset: 0,
+      zIndex: 10,
+      color: CUP_COLOR_PALETTES[idx % CUP_COLOR_PALETTES.length],
+    }));
   }, []);
 
+  // Set initial idle stage cups
   useEffect(() => {
-    const config = getLevelConfig(level);
-    setCupCount(config.cups);
-    setDisplayCups(initRoundCups(config.cups));
-  }, [level, initRoundCups]);
+    const config = getLevelConfig(1);
+    setCups(createCupList(config.cups));
+  }, [createCupList]);
 
-  // Start Game / Next Level trigger
-  const startRound = useCallback(() => {
-    playSound('start');
-    const config = getLevelConfig(level);
-    const newCupCount = config.cups;
-    setCupCount(newCupCount);
-    
-    // Pick random ball index
-    const correctCup = Math.floor(Math.random() * newCupCount);
-    setBallIndex(correctCup);
-    setDisplayCups(initRoundCups(newCupCount));
-    setSelectedCupIndex(null);
-    setIsIncorrect(false);
+  // Pick two random slot indices for shuffle
+  const pickTwoRandomSlots = (count: number, lastPair: [number, number]): [number, number] => {
+    let a = Math.floor(Math.random() * count);
+    let b = Math.floor(Math.random() * count);
+    while (b === a || (count > 2 && a === lastPair[1] && b === lastPair[0])) {
+      b = Math.floor(Math.random() * count);
+    }
+    return [a, b];
+  };
 
-    // PREVIEW state (1.5 seconds per SPEC)
-    setGameState('PREVIEW');
+  // Run the full round sequence: PREVIEW -> MIXING -> CHOOSING
+  const runRound = useCallback(
+    async (roundLevel: number) => {
+      const config = getLevelConfig(roundLevel);
+      setCurrentSwapDuration(config.swapDuration);
 
-    setTimeout(() => {
+      // Create initial cups and pick random ball cup
+      const newCups = createCupList(config.cups);
+      const chosenBallIndex = Math.floor(Math.random() * config.cups);
+      const chosenBallCupId = newCups[chosenBallIndex].id;
+
+      setCups(newCups);
+      setBallCupId(chosenBallCupId);
+      setRevealedCupIds([chosenBallCupId]);
+      setGameState('PREVIEW');
+      playSound('start');
+
+      // PREVIEW stage: reveal ball for 1.5s
+      await sleep(1500);
+      if (!isPlayingRef.current) return;
+
+      // Close cup and enter MIXING
+      setRevealedCupIds([]);
+      await sleep(300);
+      if (!isPlayingRef.current) return;
+
       setGameState('MIXING');
-      executeShuffles(config.shuffleCount, config.speed, newCupCount, correctCup);
-    }, 1500);
-  }, [level, initRoundCups]);
 
-  const handleGameStart = () => {
+      // Async shuffle loop per SPEC Section 3.3
+      let lastPair: [number, number] = [-1, -1];
+      for (let step = 0; step < config.shuffleCount; step++) {
+        if (!isPlayingRef.current) return;
+
+        const [slotA, slotB] = pickTwoRandomSlots(config.cups, lastPair);
+        lastPair = [slotA, slotB];
+
+        // 1. Swap slotIndex and apply arch yOffset: A goes up (-30px, z: 30), B goes down (30px, z: 20)
+        setCups((prev) =>
+          prev.map((c) => {
+            if (c.slotIndex === slotA) {
+              return { ...c, slotIndex: slotB, yOffset: -30, zIndex: 30 };
+            }
+            if (c.slotIndex === slotB) {
+              return { ...c, slotIndex: slotA, yOffset: 30, zIndex: 20 };
+            }
+            return { ...c, yOffset: 0, zIndex: 10 };
+          })
+        );
+        playSound('shuffle');
+
+        // Wait for movement to finish
+        await sleep(config.swapDuration);
+        if (!isPlayingRef.current) return;
+
+        // 2. Reset yOffsets back to 0px
+        setCups((prev) =>
+          prev.map((c) => ({
+            ...c,
+            yOffset: 0,
+            zIndex: 10,
+          }))
+        );
+
+        // Wait for step delay cooldown
+        await sleep(config.stepDelay);
+        if (!isPlayingRef.current) return;
+      }
+
+      // Mixing finished -> CHOOSING
+      setGameState('CHOOSING');
+    },
+    [createCupList]
+  );
+
+  const handleStartGame = () => {
+    isPlayingRef.current = true;
     setLevel(1);
     setScore(0);
-    startRound();
+    runRound(1);
   };
 
-  // Execute shuffle animation sequence with 200ms pause per step
-  const executeShuffles = (totalShuffles: number, speed: number, currentCupCount: number, initialBallPos: number) => {
-    let currentStep = 0;
-    let currentBallPos = initialBallPos;
-    let lastPair: [number, number] = [-1, -1];
-
-    const stepShuffle = () => {
-      if (currentStep < totalShuffles) {
-        let idx1 = Math.floor(Math.random() * currentCupCount);
-        let idx2 = Math.floor(Math.random() * currentCupCount);
-        while (idx2 === idx1 || (currentCupCount > 2 && idx1 === lastPair[1] && idx2 === lastPair[0])) {
-          idx2 = Math.floor(Math.random() * currentCupCount);
-        }
-        lastPair = [idx1, idx2];
-
-        setDisplayCups((prev) => {
-          const next = [...prev];
-          const temp = next[idx1];
-          next[idx1] = next[idx2];
-          next[idx2] = temp;
-          return next;
-        });
-
-        if (currentBallPos === idx1) {
-          currentBallPos = idx2;
-        } else if (currentBallPos === idx2) {
-          currentBallPos = idx1;
-        }
-
-        playSound('shuffle');
-        currentStep++;
-
-        // speed + 200ms pause interval per SPEC
-        shuffleTimerRef.current = setTimeout(stepShuffle, speed + 200);
-      } else {
-        setBallIndex(currentBallPos);
-        setGameState('CHOOSING');
-      }
-    };
-
-    shuffleTimerRef.current = setTimeout(stepShuffle, speed + 200);
-  };
-
-  // Handle cup selection by user
-  const handleCupClick = (cupId: number) => {
+  // Handle player choice during CHOOSING
+  const handleCupClick = async (clickedCupId: string) => {
     if (gameState !== 'CHOOSING') return;
 
-    setSelectedCupIndex(cupId);
-    const isCorrectChoice = cupId === ballIndex;
+    setGameState('REVEAL');
+    const isCorrect = clickedCupId === ballCupId;
 
-    if (isCorrectChoice) {
+    if (isCorrect) {
+      // Correct! Open chosen cup
+      setRevealedCupIds([clickedCupId]);
       playSound('correct');
-      setGameState('ROUND_CLEAR');
 
-      // Score formula: (현재 레벨 × 100) + (잔여 컵 개수 × 50) + (난이도 보너스)
       const config = getLevelConfig(level);
-      const bonus = level * 20;
-      const roundScoreEarned = (level * 100) + (config.cups * 50) + bonus;
-      const newScore = score + roundScoreEarned;
+      const roundEarned = calculateRoundScore(level, config.cups);
+      const newScore = score + roundEarned;
       setScore(newScore);
 
       if (newScore > bestScore) {
         setBestScore(newScore);
-        localStorage.setItem('cup_game_best_score', newScore.toString());
+        try {
+          localStorage.setItem(BEST_SCORE_STORAGE_KEY, newScore.toString());
+        } catch {
+          // ignore storage error
+        }
       }
 
-      setTimeout(() => {
-        setLevel((prev) => prev + 1);
-        startRound();
-      }, 1000);
+      await sleep(350);
+      setGameState('ROUND_CLEAR');
+
+      // 1.2s celebration then proceed to next level per SPEC
+      await sleep(1200);
+      if (!isPlayingRef.current) return;
+
+      const nextLevel = level + 1;
+      setLevel(nextLevel);
+      runRound(nextLevel);
     } else {
+      // Incorrect! Open clicked cup and also reveal the winning cup
+      setRevealedCupIds([clickedCupId, ballCupId]);
       playSound('incorrect');
-      setIsIncorrect(true);
+
+      await sleep(600);
+      isPlayingRef.current = false;
       setGameState('GAME_OVER');
 
       if (score > bestScore) {
         setBestScore(score);
-        localStorage.setItem('cup_game_best_score', score.toString());
+        try {
+          localStorage.setItem(BEST_SCORE_STORAGE_KEY, score.toString());
+        } catch {
+          // ignore storage error
+        }
       }
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 text-slate-700 flex flex-col justify-between selection:bg-pink-300 selection:text-pink-900">
       <Header score={score} bestScore={bestScore} level={level} />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+        <StatusAlert gameState={gameState} />
+
         <GameBoard
           gameState={gameState}
-          cupCount={cupCount}
-          ballIndex={ballIndex}
-          displayCups={displayCups}
-          selectedCupIndex={selectedCupIndex}
-          isIncorrect={isIncorrect}
+          cups={cups}
+          ballCupId={ballCupId}
+          revealedCupIds={revealedCupIds}
+          swapDuration={currentSwapDuration}
           onCupClick={handleCupClick}
-          onGameStart={handleGameStart}
+          onGameStart={handleStartGame}
         />
       </main>
 
       <GameOverModal
         isOpen={gameState === 'GAME_OVER'}
         score={score}
+        level={level}
         bestScore={bestScore}
-        onRestart={handleGameStart}
+        onRestart={handleStartGame}
       />
     </div>
   );

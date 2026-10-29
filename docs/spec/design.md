@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 화면·UI 설계
 
-> 문서 버전 v11 · 완성도 100% · 마지막 수정 2026. 10. 29. 12시 40분 48초
+> 문서 버전 v13 · 완성도 100% · 마지막 수정 2026. 10. 29. 12시 58분 47초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -16,18 +16,27 @@
 ## 1. 화면과 주소(URL) 구성
 
 ### 1. 화면 구성
-- **단일 페이지 앱 (SPA)** 구조로 `/` 경로 하나에서 상태에 따라 화면 요소가 변경됨.
+- 단일 페이지 앱 (`/`) 구조
 
-### 2. UI 레이아웃 및 텍스트 (아기자기한 스타일 적용)
-- **상단 헤더**: 
-  - 타이틀: `✨ 알록달록 컵 섞기 대작전 ✨` (폰트 크기 `text-3xl font-extrabold text-pink-500 drop-shadow-sm`)
-  - 점수판 카드: `bg-white/80 backdrop-blur-md shadow-md rounded-2xl p-4 flex gap-6 text-slate-700 font-semibold border border-pink-100` (현재 점수, 최고 점수, 레벨 표시)
-- **중앙 플레이 영역**:
-  - 안내 문구 (`statusText`): 말풍선 형태의 디자인(`bg-white border-2 border-pink-200 rounded-2xl px-6 py-3 text-pink-600 font-bold shadow-sm mb-6`)으로 상태 표시 ("공이 숨겨진 컵을 눈여겨보세요!", "샤샥- 섞이는 중! 눈을 떼지 마세요!", "어느 컵에 들어있을까요? 꾹 눌러보세요!")
-  - 컵 그리드 컨테이너: `relative h-56 w-full max-w-xl mx-auto flex items-center justify-center overflow-hidden bg-white/50 rounded-3xl border border-pink-100 shadow-inner p-4`
-  - 컵 아이템 (`CupItem`): 파스텔톤 컬러의 둥근 컵 디자인(이모지 🥤 및 귀여운 파스텔 배경), 튀어오르는 호버 애니메이션(`hover:-translate-y-2 transition-transform duration-200`).
-- **하단 액션 영역**:
-  - `IDLE` / `GAME_OVER` 상태: 귀여운 핑크/퍼플 그라데이션 버튼 (`bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-4 px-8 rounded-full shadow-lg shadow-pink-300/50 text-lg transform active:scale-95 transition-all`)
+### 2. 플레이 영역 상세 구성
+- **상단 헤더 (`Header.tsx`)**:
+  - 타이틀: `✨ 알록달록 컵 섞기 대작전 ✨`
+  - 점수 정보: [현재 점수: 0] / [최고 점수: 1250] / [현재 레벨: Lv.1]
+- **상태 안내 말풍선**:
+  - `PREVIEW`: "공이 숨겨진 컵을 잘 기억해두세요! 👁️"
+  - `MIXING`: "샤샤샥- 섞이는 중! 컵의 움직임을 끝까지 쫓아가세요! 👀"
+  - `CHOOSING`: "공이 들어있는 컵을 터치해보세요! 👆"
+  - `ROUND_CLEAR`: "정답입니다! 다음 라운드로 출발! 🎉"
+  - `GAME_OVER`: "아쉽네요! 다시 도전해볼까요? 😢"
+- **컵 플레이 스테이지 (`GameBoard.tsx`)**:
+  - 컵 컨테이너: 가로 최대 600px의 상대좌표 영역(`relative h-64 w-full flex items-center justify-center bg-white/60 rounded-3xl border-2 border-pink-100 p-6 shadow-inner`)
+  - 컵 슬롯: 컵 개수에 맞춰 균등한 간격으로 절대 배치되는 슬롯 트랙
+  - 컵 본체 (`CupItem.tsx`):
+    - 닫힌 컵: 파스텔 핑크/옐로우/스카이블루/퍼플 컬러의 아기자기한 컵 그래픽 (`w-20 h-28 rounded-t-3xl shadow-lg flex items-center justify-center`)
+    - 열린 컵: 미리보기 및 공개 시 위로 45px 들려 올라가는 오픈 트랜지션
+    - 바닥 공: 컵 아래 슬롯 바닥에 놓인 반짝이는 황금구슬(🟡) 이모지 또는 3D 볼 그래픽
+- **게임 오버 팝업 (`GameOverModal.tsx`)**:
+  - 최종 점수, 레벨, 최고 점수 갱신 축하 문구, '다시 하기' 버튼
 
 ## 2. 디자인 가이드
 
@@ -50,6 +59,8 @@
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v13 | 2026. 10. 29. 12시 53분 56초 | 최종 감수: 컵 섞기 애니메이션이 브라우저에서 확실하게 보이도록 DOM 배치 및 CSS 트랜지션 타이밍 규칙을 극대화하고 개발 시작 가능한 최종 감수 완료 |
+| v12 | 2026. 10. 29. 12시 52분 46초 | 컵이 섞이는 과정이 눈으로 명확히 보이도록 절대 좌표 슬라이딩 및 곡선 교차 애니메이션 구현 명세를 상세화했습니다. |
 | v11 | 2026. 10. 29. 12시 40분 33초 | 최종 감수: 디자인을 아기자기하고 귀여운 파스텔톤 스타일로 전면 개편하고, 컵 섞기 야바위 게임의 모든 기능 명세, 화면 레이아웃, 데이터 및 테스트 시나리오를 최종 감수하여 완성했습니다. |
 | v10 | 2026. 10. 29. 12시 40분 25초 | 야바위 게임의 디자인을 아기자기하고 귀여운 스타일(파스텔톤 배경, 둥근 모서리, 귀여운 폰트 및 이모지/애니메이션 감성)으로 전면 개편합니다. |
 | v9 | 2026. 10. 29. 12시 37분 18초 | 컵이 멈춰있던 문제를 해결하기 위해 React 상태와 절대 좌표(translateX) 기반의 컵 이동 애니메이션 로직을 전면 재구축하고, 시각적 추적 과정을 명확히 보완함. |

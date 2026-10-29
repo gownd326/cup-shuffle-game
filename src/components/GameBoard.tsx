@@ -1,79 +1,91 @@
-import React from 'react';
-import { GameState } from '../types/game';
+import React, { useState, useEffect, useRef } from 'react';
+import { GameState, CupItemData } from '../types/game';
 import CupItem from './CupItem';
 
 interface GameBoardProps {
   gameState: GameState;
-  cupCount: number;
-  ballIndex: number;
-  displayCups: number[];
-  selectedCupIndex: number | null;
-  isIncorrect: boolean;
-  onCupClick: (cupId: number) => void;
+  cups: CupItemData[];
+  ballCupId: string;
+  revealedCupIds: string[];
+  swapDuration: number;
+  onCupClick: (cupId: string) => void;
   onGameStart: () => void;
 }
 
 export default function GameBoard({
   gameState,
-  cupCount,
-  ballIndex,
-  displayCups,
-  selectedCupIndex,
-  isIncorrect,
+  cups,
+  ballCupId,
+  revealedCupIds,
+  swapDuration,
   onCupClick,
   onGameStart,
 }: GameBoardProps) {
-  // Status text matching SPEC
-  const getStatusText = () => {
-    switch (gameState) {
-      case 'IDLE':
-        return '공이 숨겨진 컵을 눈여겨보세요!';
-      case 'PREVIEW':
-        return '공이 숨겨진 컵을 눈여겨보세요!';
-      case 'MIXING':
-        return '샤샥- 섞이는 중! 눈을 떼지 마세요!';
-      case 'CHOOSING':
-        return '어느 컵에 들어있을까요? 꾹 눌러보세요!';
-      case 'ROUND_CLEAR':
-        return '정답입니다! 다음 라운드로...';
-      case 'GAME_OVER':
-        return '게임 오버!';
-      default:
-        return '';
-    }
-  };
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [slotWidth, setSlotWidth] = useState<number>(100);
+
+  // Responsive slot width calculation:
+  // slot spacing between 80px (mobile) ~ 110px (desktop)
+  useEffect(() => {
+    const updateSlotWidth = () => {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.clientWidth;
+      const count = Math.max(cups.length, 3);
+      const cupWidth = window.innerWidth < 640 ? 80 : 96;
+
+      // Calculate slotWidth to distribute cups evenly inside container
+      const availableWidth = containerWidth - 48; // padding
+      const computedSlot = Math.floor((availableWidth - cupWidth) / (count - 1));
+      const clamped = Math.max(76, Math.min(110, computedSlot));
+      setSlotWidth(clamped);
+    };
+
+    updateSlotWidth();
+    window.addEventListener('resize', updateSlotWidth);
+    return () => window.removeEventListener('resize', updateSlotWidth);
+  }, [cups.length]);
+
+  const cupCount = cups.length;
+  const cupWidth = typeof window !== 'undefined' && window.innerWidth < 640 ? 80 : 96;
+  const trackTotalWidth = (cupCount - 1) * slotWidth + cupWidth;
 
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center">
-      <div className="mb-6 text-center flex items-center justify-center">
-        <div className="bg-white border-2 border-pink-200 rounded-2xl px-6 py-3 text-pink-600 font-bold shadow-sm transition-all duration-300">
-          {getStatusText()}
+      {/* Stage Container */}
+      <div
+        ref={containerRef}
+        className="relative h-64 w-full flex items-center justify-center bg-white/60 rounded-3xl border-2 border-pink-100 p-6 shadow-inner overflow-hidden"
+      >
+        {/* Track Area where absolute cups slide */}
+        <div
+          style={{ width: `${trackTotalWidth}px` }}
+          className="relative h-44 flex items-center"
+        >
+          {cups.map((cup) => {
+            const hasBall = cup.id === ballCupId;
+            const isOpen = revealedCupIds.includes(cup.id);
+
+            return (
+              <CupItem
+                key={cup.id}
+                cup={cup}
+                slotWidth={slotWidth}
+                swapDuration={swapDuration}
+                gameState={gameState}
+                hasBall={hasBall}
+                isOpen={isOpen}
+                onClick={onCupClick}
+              />
+            );
+          })}
         </div>
       </div>
 
-      <div className="relative h-56 w-full max-w-xl mx-auto flex items-center justify-center overflow-hidden bg-white/50 rounded-3xl border border-pink-100 shadow-inner p-4 gap-6">
-        {displayCups.map((cupOriginalId, visualIdx) => {
-          const hasBall = cupOriginalId === ballIndex;
-          const isSelected = selectedCupIndex === cupOriginalId;
-
-          return (
-            <CupItem
-              key={cupOriginalId}
-              cupId={cupOriginalId}
-              visualIdx={visualIdx}
-              gameState={gameState}
-              hasBall={hasBall}
-              isSelected={isSelected}
-              isIncorrect={isIncorrect}
-              onClick={() => onCupClick(cupOriginalId)}
-            />
-          );
-        })}
-      </div>
-
+      {/* Action Button: Visible during IDLE or GAME_OVER */}
       {(gameState === 'IDLE' || gameState === 'GAME_OVER') && (
         <div className="mt-8">
           <button
+            type="button"
             onClick={onGameStart}
             className="bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-4 px-8 rounded-full shadow-lg shadow-pink-300/50 text-lg transform active:scale-95 transition-all cursor-pointer"
           >

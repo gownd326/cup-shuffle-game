@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 개발 문서
 
-> 문서 버전 v11 · 완성도 100% · 마지막 수정 2026. 10. 29. 12시 40분 48초
+> 문서 버전 v13 · 완성도 100% · 마지막 수정 2026. 10. 29. 12시 58분 47초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -45,45 +45,77 @@
 
 ### 1. 게임 진행 로직
 - **상태 정의 (`gameState`)**
-  - `IDLE`: 게임 시작 대기 중
-  - `PREVIEW`: 시작 전 공이 들어있는 컵을 1.5초 동안 확실히 보여줌
-  - `MIXING`: 컵들이 실제로 자리를 바꾸는 애니메이션(좌우/교차 이동)을 수행 중 (유저 클릭 방지, 컵 이동 경로 시각화)
-  - `CHOOSING`: 유저가 컵을 선택할 수 있는 상태
-  - `ROUND_CLEAR`: 정답을 맞춰 다음 레벨로 넘어가기 전 잠시 대기 (1초)
-  - `GAME_OVER`: 오답을 선택하여 게임이 종료된 상태
+  - `IDLE`: 게임 시작 대기 중 (시작 버튼 노출)
+  - `PREVIEW`: 시작 직후 공이 든 정답 컵이 위로 들리며(`translateY(-50px)`) 1.5초간 공의 위치를 사용자에게 각인
+  - `MIXING`: 컵이 닫힌 뒤 무작위 두 컵을 순차적으로 교환하는 단계 (이동 애니메이션 지속, 사용자 터치/클릭 입력 완전 차단 `pointer-events: none`)
+  - `CHOOSING`: 모든 섞기 과정이 끝나고 사용자가 컵 하나를 고를 수 있는 단계 (`pointer-events: auto`)
+  - `REVEAL`: 클릭한 컵이 위로 열리며 정답 확인 (성공 시 바로 `ROUND_CLEAR`, 실패 시 정답 컵까지 추가로 열리며 `GAME_OVER`)
+  - `ROUND_CLEAR`: 축하 이펙트 노출 후 점수 획득, 1.2초 후 다음 레벨 준비
+  - `GAME_OVER`: 최종 점수 및 최고 점수 갱신 확인 모달 노출
 
-### 2. 레벨 디자인 세부 규칙 (시각적 추적 고려)
-- **레벨 1**: 컵 3개, 섞기 횟수 4회, 섞기 이동 시간(속도) 700ms (눈으로 쉽게 쫓을 수 있는 속도)
-- **레벨 2**: 컵 3개, 섞기 횟수 6회, 섞기 이동 시간 600ms
-- **레벨 3**: 컵 4개, 섞기 횟수 7회, 섞기 이동 시간 500ms
-- **레벨 4**: 컵 4개, 섞기 횟수 9회, 섞기 이동 시간 400ms
-- **레벨 5 이상**: 컵 5개, 섞기 횟수 10회 이상, 섞기 이동 시간 350ms로 고정
+### 2. 레벨 디자인 (눈으로 확실히 추적 가능한 속도 설정)
+| 레벨 | 컵 개수 | 교환 횟수 | 1회 교환 이동시간(ms) | 교환 간 대기(ms) | 특징 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Lv.1 | 3개 | 4회 | 750ms | 250ms | 큼직하고 여유로운 이동 |
+| Lv.2 | 3개 | 6회 | 650ms | 200ms | 자연스러운 속도감 |
+| Lv.3 | 4개 | 7회 | 550ms | 150ms | 컵 4개 확장, 눈동자 집중 |
+| Lv.4 | 4개 | 9회 | 480ms | 120ms | 난이도 상승 |
+| Lv.5+ | 5개 | 10회 | 420ms | 100ms | 최고 난이도 도전 |
 
-### 3. 애니메이션 동작 규칙 (`MIXING` 상태 - 컵 이동 구현 필수)
-- **인덱스 배열 및 물리적 위치 재조정**: 컴포넌트 내부에 `cupPositions` 상태 배열을 두어 섞기 스텝마다 무작위로 두 컵의 인덱스를 swap(교환)한다.
-- **동적 `translateX` 적용**: 각 컵은 자신의 고유 `id`를 가지고 있으며, 현재 배열 내에서의 인덱스 위치(`currentIndex`)에 따라 `style={{ transform: `translateX(${currentIndex * 120}px)`, transition: `transform ${speed}ms ease-in-out` }}` 속성을 실시간으로 부여받아 컨테이너 내에서 미끄러지듯 자리를 바꾼다.
-- **스텝별 딜레이 제어**: 각 섞기 교환 사이에 `setTimeout`을 주어 컵들이 동시에 순간이동하지 않고 순차적으로 명확한 궤적을 그리며 움직이도록 보장한다.
-- **입력 잠금**: `MIXING` 상태에서는 모든 컵의 클릭 이벤트(`pointer-events: none`)를 원천 차단한다.
+### 3. 컵 이동 애니메이션 가시화 보장 규칙 (순간이동 방지)
+- **좌표 시스템과 고유 컵 관리**:
+  - 각 컵 객체는 불변의 고유 `id` (`cup-0`, `cup-1`, `cup-2`, ...)와 현재 위치 인덱스 `slotIndex` (0 ~ N-1)를 가진다.
+  - React의 리렌더링으로 컵 DOM이 새로 마운트되는 것을 방지하기 위해 컵 리스트의 순서를 배열 자체로 reorder하지 않고, 각 컵 컴포넌트의 `slotIndex` 프로퍼티 값만 변경한다.
+- **CSS 픽셀 단위 인라인 Transform**:
+  - 슬롯 간격 `SLOT_WIDTH = 90px` (모바일) ~ `110px` (PC).
+  - 각 컵 컨테이너는 절대좌표(`position: absolute; left: 0;`)에 위치하며 `transform: translate3d(${slotIndex * slotWidth}px, ${yOffset}px, 0)`로 이동한다.
+  - CSS 트랜지션: `transition: transform ${swapDuration}ms cubic-bezier(0.25, 1, 0.5, 1)`을 상시 적용하여 `slotIndex`가 바뀌는 즉시 브라우저가 물리적 이동 궤적을 렌더링하도록 보장한다.
+- **아치형(포물선) 교차 입체감**:
+  - 자리를 바꾸는 두 컵 중 A컵은 위로 `yOffset = -30px`, `z-index = 30`.
+  - B컵은 아래로 `yOffset = 30px`, `z-index = 20`.
+  - 자리를 바꾸지 않고 가만히 있는 컵들은 `yOffset = 0px`, `z-index = 10`.
+  - 이동이 완료된 직후(`swapDuration` 후) `yOffset`을 다시 `0px`로 복원하여 다음 이동을 준비한다.
+- **비동기 섞기 루프 구조 (`runShuffle`)**:
+  - `async/await`와 `setTimeout` 기반의 `sleep` 유틸리티를 사용하여 반드시 (이동 시간 + 쿨다운 대기시간)이 지난 후에 다음 교환을 트리거한다.
+  - 코드 패턴 예시:
+    ```ts
+    for (let step = 0; step < totalSteps; step++) {
+      const [idxA, idxB] = pickTwoRandomIndices(cupCount);
+      swapSlots(idxA, idxB); // slotIndex 및 yOffset 변경
+      await sleep(swapDuration);
+      resetYOffsets(); // yOffset 0으로 정렬
+      await sleep(stepDelay);
+    }
+    ```
 
-### 4. 점수 산정 방식
-- 라운드 클리어 시 획득 점수 = `(현재 레벨 × 100) + (잔여 컵 개수 × 50)`
-- 게임 종료 시 `localStorage`의 `cup_game_best_score`와 비교하여 현재 점수가 더 높을 경우 갱신.
+### 4. 점수 계산 및 유지
+- 라운드 통과 시 획득 점수 = `(현재 레벨 × 100) + (잔여 컵 개수 × 50)`
+- 게임 종료 시 `bestScore`보다 높으면 즉시 브라우저 `localStorage`에 자동 갱신
 
 ## 4. 화면과 주소(URL) 구성
 
 ### 1. 화면 구성
-- **단일 페이지 앱 (SPA)** 구조로 `/` 경로 하나에서 상태에 따라 화면 요소가 변경됨.
+- 단일 페이지 앱 (`/`) 구조
 
-### 2. UI 레이아웃 및 텍스트 (아기자기한 스타일 적용)
-- **상단 헤더**: 
-  - 타이틀: `✨ 알록달록 컵 섞기 대작전 ✨` (폰트 크기 `text-3xl font-extrabold text-pink-500 drop-shadow-sm`)
-  - 점수판 카드: `bg-white/80 backdrop-blur-md shadow-md rounded-2xl p-4 flex gap-6 text-slate-700 font-semibold border border-pink-100` (현재 점수, 최고 점수, 레벨 표시)
-- **중앙 플레이 영역**:
-  - 안내 문구 (`statusText`): 말풍선 형태의 디자인(`bg-white border-2 border-pink-200 rounded-2xl px-6 py-3 text-pink-600 font-bold shadow-sm mb-6`)으로 상태 표시 ("공이 숨겨진 컵을 눈여겨보세요!", "샤샥- 섞이는 중! 눈을 떼지 마세요!", "어느 컵에 들어있을까요? 꾹 눌러보세요!")
-  - 컵 그리드 컨테이너: `relative h-56 w-full max-w-xl mx-auto flex items-center justify-center overflow-hidden bg-white/50 rounded-3xl border border-pink-100 shadow-inner p-4`
-  - 컵 아이템 (`CupItem`): 파스텔톤 컬러의 둥근 컵 디자인(이모지 🥤 및 귀여운 파스텔 배경), 튀어오르는 호버 애니메이션(`hover:-translate-y-2 transition-transform duration-200`).
-- **하단 액션 영역**:
-  - `IDLE` / `GAME_OVER` 상태: 귀여운 핑크/퍼플 그라데이션 버튼 (`bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-4 px-8 rounded-full shadow-lg shadow-pink-300/50 text-lg transform active:scale-95 transition-all`)
+### 2. 플레이 영역 상세 구성
+- **상단 헤더 (`Header.tsx`)**:
+  - 타이틀: `✨ 알록달록 컵 섞기 대작전 ✨`
+  - 점수 정보: [현재 점수: 0] / [최고 점수: 1250] / [현재 레벨: Lv.1]
+- **상태 안내 말풍선**:
+  - `PREVIEW`: "공이 숨겨진 컵을 잘 기억해두세요! 👁️"
+  - `MIXING`: "샤샤샥- 섞이는 중! 컵의 움직임을 끝까지 쫓아가세요! 👀"
+  - `CHOOSING`: "공이 들어있는 컵을 터치해보세요! 👆"
+  - `ROUND_CLEAR`: "정답입니다! 다음 라운드로 출발! 🎉"
+  - `GAME_OVER`: "아쉽네요! 다시 도전해볼까요? 😢"
+- **컵 플레이 스테이지 (`GameBoard.tsx`)**:
+  - 컵 컨테이너: 가로 최대 600px의 상대좌표 영역(`relative h-64 w-full flex items-center justify-center bg-white/60 rounded-3xl border-2 border-pink-100 p-6 shadow-inner`)
+  - 컵 슬롯: 컵 개수에 맞춰 균등한 간격으로 절대 배치되는 슬롯 트랙
+  - 컵 본체 (`CupItem.tsx`):
+    - 닫힌 컵: 파스텔 핑크/옐로우/스카이블루/퍼플 컬러의 아기자기한 컵 그래픽 (`w-20 h-28 rounded-t-3xl shadow-lg flex items-center justify-center`)
+    - 열린 컵: 미리보기 및 공개 시 위로 45px 들려 올라가는 오픈 트랜지션
+    - 바닥 공: 컵 아래 슬롯 바닥에 놓인 반짝이는 황금구슬(🟡) 이모지 또는 3D 볼 그래픽
+- **게임 오버 팝업 (`GameOverModal.tsx`)**:
+  - 최종 점수, 레벨, 최고 점수 갱신 축하 문구, '다시 하기' 버튼
 
 ## 5. 데이터 모델
 
@@ -114,29 +146,40 @@
 ## 7. 기술 스택과 폴더 구조
 
 ### 1. 기술 스택
-- 프레임워크: Vite + React (TypeScript)
-- 스타일링: Tailwind CSS
-- 아이콘: Lucide React
+- 프레임워크: Vite + React 18 (TypeScript)
+- 스타일링: Tailwind CSS (파스텔 테마 및 CSS 애니메이션 유틸리티)
+- 사운드: Web Audio API (외부 파일 로딩 의존성 없는 자체 신디사이저 비프음 및 효과음 구현)
+- 아이콘: Lucide React (트로피, 별, 리셋 아이콘 등)
 
-### 2. 디렉토리 구조
+### 2. 프로젝트 디렉토리 구조
 ```text
-src/
-├── App.tsx
-├── main.tsx
-├── index.css
-├── types/
-│   └── game.ts
-├── components/
-│   ├── Header.tsx
-│   ├── GameBoard.tsx
-│   ├── CupItem.tsx
-│   └── GameOverModal.tsx
-└── utils/
-    └── sound.ts
+cup-shuffle-game/
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.js
+└── src/
+    ├── main.tsx
+    ├── App.tsx
+    ├── index.css
+    ├── types/
+    │   └── game.ts         # GameState, CupItem, LevelConfig 타입 정의
+    ├── constants/
+    │   └── levels.ts       # 레벨별 속도, 컵 개수, 섞기 횟수 상수 테이블
+    ├── utils/
+    │   ├── sound.ts        # Web Audio API 톤 생성기 (정답, 땡, 섞기 틱음)
+    │   └── timer.ts        # sleep 비동기 헬퍼
+    └── components/
+        ├── Header.tsx       # 점수, 레벨, 최고점수 현황판
+        ├── StatusAlert.tsx  # 현재 게임 상태 말풍선 안내
+        ├── GameBoard.tsx    # 컵 트랙 및 섞기 루프 제어 컴포넌트
+        ├── CupItem.tsx      # 개별 컵 그래픽, transform 애니메이션 및 공 렌더러
+        └── GameOverModal.tsx# 게임 종료 팝업 및 다시 시작 버튼
 ```
 
 ### 3. 환경 변수
-- 프론트엔드 단독 프로젝트이므로 별도의 환경 변수(`.env`)는 필요하지 않음.
+- 순수 프론트엔드 게임이므로 환경 변수(`.env`) 불필요.
 
 ## 8. 품질 기준 (성능·보안·접근성)
 
@@ -156,26 +199,33 @@ src/
 
 ## 10. 테스트 계획
 
-### 1. 수용 기준 (Given / When / Then)
-- **시나리오 1: 정상 게임 시작 및 미리보기**
-  - **Given** 사용자가 메인 화면(`/`)에 접속해 있다.
-  - **When** '게임 시작' 버튼을 클릭한다.
-  - **Then** 게임 상태가 `PREVIEW`로 바뀌며 공이 들어있는 컵이 1.5초 동안 확실히 표시된다.
+### 1. 연기 테스트 (Smoke Test)
+- `GET /`: 상태 코드 200 정상 로딩 확인
+- 초기 타이틀 문구 '알록달록 컵 섞기 대작전' 및 '게임 시작' 버튼 렌더링 확인
 
-- **시나리오 2: 컵 이동 애니메이션 가시화 및 섞기 (핵심)**
-  - **Given** `PREVIEW` 상태가 끝나고 `MIXING` 상태로 진입했다.
-  - **When** 설정된 레벨별 속도(예: 700ms)와 지연 시간(200ms)에 맞춰 컵 배열의 인덱스가 변경된다.
-  - **Then** 각 컵 요소에 `transform: translateX(...)`가 정상 주입되어 컵들이 서로 자리를 바꾸며 이동하는 모습이 눈으로 명확히 확인된다.
+### 2. 수용 기준 및 시나리오
+- **시나리오 1: 시작 및 공 위치 인지 (PREVIEW)**
+  - **Given** 사용자가 홈 화면에서 '게임 시작' 버튼을 클릭한다.
+  - **When** 게임 상태가 `PREVIEW`로 전환된다.
+  - **Then** 공이 들어있는 정답 컵 1개가 부드럽게 위로 열리며 황금구슬(🟡)이 1.5초간 노출된 뒤 다시 덮인다.
 
-- **시나리오 3: 정답 선택 및 레벨 업**
-  - **Given** 컵 섞기가 끝나고 유저가 컵을 선택할 수 있는 `CHOOSING` 상태이다.
-  - **When** 공이 숨겨진 올바른 컵을 클릭한다.
-  - **Then** 점수가 합산되고 레벨이 1 증가하며 다음 라운드가 시작된다.
+- **시나리오 2: 섞는 과정 가시화 (MIXING 애니메이션)**
+  - **Given** 공이 덮이고 `MIXING` 상태로 진입한다.
+  - **When** 컵들이 자리를 바꾸기 시작한다.
+  - **Then**
+    1. 두 개의 컵이 순간이동하지 않고 화면상에서 좌우/상하 아치를 그리며 미끄러지듯 이동하는 것이 사용자 눈으로 분명히 관찰된다.
+    2. 이동 중에는 컵 클릭 이벤트가 무시된다(`pointer-events-none`).
+    3. 지정된 레벨 횟수만큼 순차적으로 교환 루프가 완료된다.
 
-- **시나리오 4: 오답 선택 및 게임 오버, 최고 점수 갱신**
-  - **Given** `CHOOSING` 상태이다.
-  - **When** 공이 없는 틀린 컵을 클릭한다.
-  - **Then** 게임 오버 모달이 팝업되고, 현재 점수가 기존 최고 점수보다 높다면 `localStorage`에 즉시 반영된다.
+- **시나리오 3: 컵 선택 및 판정 (CHOOSING & REVEAL)**
+  - **Given** 섞기가 모두 끝나고 `CHOOSING` 상태가 된다.
+  - **When** 사용자가 공이 들어있다고 생각하는 컵을 클릭한다.
+  - **Then** 선택한 컵이 위로 들리며, 맞췄다면 다음 레벨로 승급하고 점수가 합산되며, 틀렸다면 정답 컵의 위치가 추가로 공개된 후 게임 오버 모달이 뜬다.
+
+- **시나리오 4: 최고 기록(Best Score) 보존**
+  - **Given** 플레이어가 이전 최고 점수(예: 0점)보다 높은 300점을 획득하고 탈락한다.
+  - **When** 게임 오버 화면이 표시되고 페이지를 새로고침한다.
+  - **Then** 상단 헤더의 최고 점수가 300점으로 유지되어 표기된다.
 
 ## 11. 가정과 기본값 (AI가 대신 정한 것)
 
@@ -195,6 +245,8 @@ src/
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v13 | 2026. 10. 29. 12시 53분 56초 | 최종 감수: 컵 섞기 애니메이션이 브라우저에서 확실하게 보이도록 DOM 배치 및 CSS 트랜지션 타이밍 규칙을 극대화하고 개발 시작 가능한 최종 감수 완료 |
+| v12 | 2026. 10. 29. 12시 52분 46초 | 컵이 섞이는 과정이 눈으로 명확히 보이도록 절대 좌표 슬라이딩 및 곡선 교차 애니메이션 구현 명세를 상세화했습니다. |
 | v11 | 2026. 10. 29. 12시 40분 33초 | 최종 감수: 디자인을 아기자기하고 귀여운 파스텔톤 스타일로 전면 개편하고, 컵 섞기 야바위 게임의 모든 기능 명세, 화면 레이아웃, 데이터 및 테스트 시나리오를 최종 감수하여 완성했습니다. |
 | v10 | 2026. 10. 29. 12시 40분 25초 | 야바위 게임의 디자인을 아기자기하고 귀여운 스타일(파스텔톤 배경, 둥근 모서리, 귀여운 폰트 및 이모지/애니메이션 감성)으로 전면 개편합니다. |
 | v9 | 2026. 10. 29. 12시 37분 18초 | 컵이 멈춰있던 문제를 해결하기 위해 React 상태와 절대 좌표(translateX) 기반의 컵 이동 애니메이션 로직을 전면 재구축하고, 시각적 추적 과정을 명확히 보완함. |

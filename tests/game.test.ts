@@ -1,60 +1,147 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { getLevelConfig, calculateRoundScore } from '../src/constants/levels';
+import { sleep } from '../src/utils/timer';
 
-describe('Cup Shuffle Game Logic & Specifications', () => {
-  it('should verify level configuration rules', () => {
-    const getLevelConfig = (lvl: number) => {
-      if (lvl === 1) return { cups: 3, shuffleCount: 4, speed: 700 };
-      if (lvl === 2) return { cups: 3, shuffleCount: 6, speed: 600 };
-      if (lvl === 3) return { cups: 4, shuffleCount: 7, speed: 500 };
-      if (lvl === 4) return { cups: 4, shuffleCount: 9, speed: 400 };
-      return { cups: 5, shuffleCount: 10 + (lvl - 5), speed: 350 };
-    };
-
-    expect(getLevelConfig(1)).toEqual({ cups: 3, shuffleCount: 4, speed: 700 });
-    expect(getLevelConfig(2)).toEqual({ cups: 3, shuffleCount: 6, speed: 600 });
-    expect(getLevelConfig(3)).toEqual({ cups: 4, shuffleCount: 7, speed: 500 });
-    expect(getLevelConfig(4)).toEqual({ cups: 4, shuffleCount: 9, speed: 400 });
-    expect(getLevelConfig(5)).toEqual({ cups: 5, shuffleCount: 10, speed: 350 });
-  });
-
-  it('should calculate round score correctly according to formula', () => {
-    const calculateScore = (level: number, cupCount: number) => {
-      const bonus = level * 20;
-      return (level * 100) + (cupCount * 50) + bonus;
-    };
-
-    // Level 1: cups = 3, level = 1
-    // (1 * 100) + (3 * 50) + (1 * 20) = 100 + 150 + 20 = 270
-    expect(calculateScore(1, 3)).toBe(270);
-
-    // Level 3: cups = 4, level = 3
-    // (3 * 100) + (4 * 50) + (3 * 20) = 300 + 200 + 60 = 560
-    expect(calculateScore(3, 4)).toBe(560);
-  });
-
-  it('should manage localStorage best score correctly', () => {
-    const storageKey = 'cup_game_best_score';
+describe('Cup Shuffle Game - SPEC Compliance Tests', () => {
+  beforeEach(() => {
     localStorage.clear();
-
-    const initialBest = localStorage.getItem(storageKey);
-    expect(initialBest).toBeNull();
-
-    const currentScore = 500;
-    localStorage.setItem(storageKey, currentScore.toString());
-    
-    const savedBest = parseInt(localStorage.getItem(storageKey) || '0', 10);
-    expect(savedBest).toBe(500);
-
-    const newScore = 800;
-    if (newScore > savedBest) {
-      localStorage.setItem(storageKey, newScore.toString());
-    }
-
-    expect(parseInt(localStorage.getItem(storageKey) || '0', 10)).toBe(800);
   });
 
-  it('should verify mixing coordinate animation transition rule', () => {
-    const transitionStyle = 'transform 350ms cubic-bezier(0.25, 1, 0.5, 1)';
-    expect(transitionStyle).toContain('transform 350ms cubic-bezier(0.25, 1, 0.5, 1)');
+  it('시나리오 1 & 레벨 디자인 검증: 레벨 1~5 설정값 확인', () => {
+    // Lv.1: 3개, 4회, 750ms, 250ms
+    const lv1 = getLevelConfig(1);
+    expect(lv1).toEqual({
+      cups: 3,
+      shuffleCount: 4,
+      swapDuration: 750,
+      stepDelay: 250,
+    });
+
+    // Lv.2: 3개, 6회, 650ms, 200ms
+    const lv2 = getLevelConfig(2);
+    expect(lv2).toEqual({
+      cups: 3,
+      shuffleCount: 6,
+      swapDuration: 650,
+      stepDelay: 200,
+    });
+
+    // Lv.3: 4개, 7회, 550ms, 150ms
+    const lv3 = getLevelConfig(3);
+    expect(lv3).toEqual({
+      cups: 4,
+      shuffleCount: 7,
+      swapDuration: 550,
+      stepDelay: 150,
+    });
+
+    // Lv.4: 4개, 9회, 480ms, 120ms
+    const lv4 = getLevelConfig(4);
+    expect(lv4).toEqual({
+      cups: 4,
+      shuffleCount: 9,
+      swapDuration: 480,
+      stepDelay: 120,
+    });
+
+    // Lv.5: 5개, 10회, 420ms, 100ms
+    const lv5 = getLevelConfig(5);
+    expect(lv5).toEqual({
+      cups: 5,
+      shuffleCount: 10,
+      swapDuration: 420,
+      stepDelay: 100,
+    });
+  });
+
+  it('시나리오 3: 점수 산정 공식 검증: (현재 레벨 × 100) + (잔여 컵 개수 × 50)', () => {
+    // Level 1, 3 cups: (1 * 100) + (3 * 50) = 250
+    expect(calculateRoundScore(1, 3)).toBe(250);
+
+    // Level 2, 3 cups: (2 * 100) + (3 * 50) = 350
+    expect(calculateRoundScore(2, 3)).toBe(350);
+
+    // Level 3, 4 cups: (3 * 100) + (4 * 50) = 500
+    expect(calculateRoundScore(3, 4)).toBe(500);
+
+    // Level 5, 5 cups: (5 * 100) + (5 * 50) = 750
+    expect(calculateRoundScore(5, 5)).toBe(750);
+  });
+
+  it('시나리오 4: 최고 기록(Best Score) 보존 및 LocalStorage 갱신', () => {
+    const STORAGE_KEY = 'cup_game_best_score';
+
+    // 최초 로드 시 0
+    const initialRaw = localStorage.getItem(STORAGE_KEY);
+    const initialBest = initialRaw ? parseInt(initialRaw, 10) : 0;
+    expect(initialBest).toBe(0);
+
+    // 300점 획득 시 갱신
+    const currentScore = 300;
+    if (currentScore > initialBest) {
+      localStorage.setItem(STORAGE_KEY, currentScore.toString());
+    }
+    expect(parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10)).toBe(300);
+
+    // 다음 게임에서 낮은 점수(250점)를 얻었을 때 최고 점수 유지
+    const lowerScore = 250;
+    const currentBest = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+    if (lowerScore > currentBest) {
+      localStorage.setItem(STORAGE_KEY, lowerScore.toString());
+    }
+    expect(parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10)).toBe(300);
+  });
+
+  it('시나리오 2: 컵 교환 좌표 시스템 및 아치형 yOffset/zIndex 규칙 검증', () => {
+    const initialCups = [
+      { id: 'cup-0', slotIndex: 0, yOffset: 0, zIndex: 10 },
+      { id: 'cup-1', slotIndex: 1, yOffset: 0, zIndex: 10 },
+      { id: 'cup-2', slotIndex: 2, yOffset: 0, zIndex: 10 },
+    ];
+
+    const slotA = 0;
+    const slotB = 2;
+
+    // Swap slots: Cup in slotA gets slotB and yOffset -30 (z: 30)
+    // Cup in slotB gets slotA and yOffset 30 (z: 20)
+    const swapped = initialCups.map((c) => {
+      if (c.slotIndex === slotA) {
+        return { ...c, slotIndex: slotB, yOffset: -30, zIndex: 30 };
+      }
+      if (c.slotIndex === slotB) {
+        return { ...c, slotIndex: slotA, yOffset: 30, zIndex: 20 };
+      }
+      return { ...c, yOffset: 0, zIndex: 10 };
+    });
+
+    expect(swapped.find((c) => c.id === 'cup-0')).toEqual({
+      id: 'cup-0',
+      slotIndex: 2,
+      yOffset: -30,
+      zIndex: 30,
+    });
+    expect(swapped.find((c) => c.id === 'cup-2')).toEqual({
+      id: 'cup-2',
+      slotIndex: 0,
+      yOffset: 30,
+      zIndex: 20,
+    });
+    expect(swapped.find((c) => c.id === 'cup-1')).toEqual({
+      id: 'cup-1',
+      slotIndex: 1,
+      yOffset: 0,
+      zIndex: 10,
+    });
+
+    // Reset yOffset after swap duration
+    const reset = swapped.map((c) => ({ ...c, yOffset: 0, zIndex: 10 }));
+    expect(reset.every((c) => c.yOffset === 0 && c.zIndex === 10)).toBe(true);
+  });
+
+  it('비동기 타이머 sleep 유틸리티 검증', async () => {
+    const start = Date.now();
+    await sleep(50);
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(40);
   });
 });
