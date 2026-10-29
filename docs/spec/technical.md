@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 기술·데이터 설계
 
-> 문서 버전 v18 · 완성도 100% · 마지막 수정 2026. 10. 29. 13시 53분 16초
+> 문서 버전 v20 · 완성도 100% · 마지막 수정 2026. 10. 29. 14시 32분 54초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -52,8 +52,8 @@
 - 프레임워크: Vite + React 18 (TypeScript)
 - 백엔드 / 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
 - 스타일링: Tailwind CSS (파스텔 테마 및 CSS Transform 애니메이션)
-- 사운드: Web Audio API (외부 파일 로딩 의존성 없는 자체 신디사이저 비프음 및 효과음 구현)
-- 아이콘: Lucide React (Trophy, RefreshCw, Star 등)
+- 사운드: Web Audio API (외부 파일 로딩 의존성 없는 브라우저 내장 신디사이저 사운드)
+- 아이콘: Lucide React (Trophy, RefreshCw, Star, Play 등)
 
 ### 2. 프로젝트 디렉토리 구조
 ```text
@@ -69,45 +69,47 @@ cup-shuffle-game/
     ├── App.tsx
     ├── index.css
     ├── lib/
-    │   └── supabase.ts     # Supabase 클라이언트 인스턴스 초기화
+    │   └── supabase.ts         # createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
     ├── types/
-    │   └── game.ts         # GameState, CupItem, LevelConfig, ScoreRecord 타입
+    │   └── game.ts             # GameState, CupItem, LevelConfig, ScoreRecord 타입
     ├── constants/
-    │   └── levels.ts       # 레벨별 속도, 컵 개수, 섞기 횟수 테이블
+    │   └── levels.ts           # 레벨별 속도, 컵 개수, 섞기 횟수 테이블
     ├── utils/
-    │   ├── sound.ts        # Web Audio API 톤 생성기
-    │   └── timer.ts        # sleep 비동기 헬퍼
+    │   ├── sound.ts            # Web Audio API 톤 생성기 (정답, 오답, 컵 이동 사운드)
+    │   └── timer.ts            # sleep 비동기 딜레이 헬퍼
     └── components/
-        ├── Header.tsx           # 점수, 레벨, 최고점수 헤더
-        ├── StatusAlert.tsx      # 현재 게임 상태 말풍선
-        ├── GameBoard.tsx        # 컵 트랙 및 위치 교환 애니메이션 제어
+        ├── Header.tsx           # 현재 점수, 최고 점수, 현재 레벨, 랭킹 보기 버튼
+        ├── StatusAlert.tsx      # 현재 게임 상태 말풍선 UI
+        ├── GameBoard.tsx        # 컵 슬롯 좌표 계산 및 translateX 애니메이션 제어
         ├── CupItem.tsx          # 100% 동일한 외관의 컵 카드 그래픽 컴포넌트
-        ├── GameOverModal.tsx    # 점수 확인 및 닉네임 등록 팝업
+        ├── GameOverModal.tsx    # 점수 확인, 닉네임 등록, 1회 저장 제한 버튼, 재도전 액션
         └── LeaderboardModal.tsx # 실시간 Supabase TOP 5 리더보드 모달
 ```
 
 ### 3. 환경 변수
-- `VITE_SUPABASE_URL`: Supabase 프로젝트 URL
-- `VITE_SUPABASE_ANON_KEY`: Supabase 공개 Anon Key
+- `VITE_SUPABASE_URL`: Supabase 프로젝트 URL (예: `https://xxxx.supabase.co`)
+- `VITE_SUPABASE_ANON_KEY`: Supabase 공개 익명 키 (Anon Key)
 
 ## 3. 품질 기준 (성능·보안·접근성)
 
 ### 1. 성능 및 애니메이션 안정성
-- **부드러운 컵 이동 보장**: DOM 요소를 재배치(재마운트)하지 않고, 고유 key를 부여한 뒤 CSS `transform` 속성(`translateX`)만 변경하여 브라우저의 리플로우(Reflow)를 방지하고 60fps 부드러운 궤적 이동 보장.
-- **중복 입력 방지**: `MIXING` 단계에서는 스테이지 전체에 `pointer-events: none`을 부여하여 사용자의 의도치 않은 터치 인터럽트 방지.
+- **눈으로 추적 가능한 컵 이동 궤적 보장**: DOM 요소를 React 렌더링으로 재마운트하지 않고, 각 컵 카드 요소에 고유 key(`cup.id`)를 부여한 상태에서 슬롯 인덱스에 따른 `transform: translateX(...)` 속성만을 변경. 브라우저의 리플로우(Reflow)를 유발하지 않고 GPU 가속 기반 60fps 부드러운 이동 궤적을 보장함.
+- **중복 입력 및 조작 방지**: `MIXING` 및 `PREVIEW` 상태에서는 게임판 전체에 `pointer-events: none`을 강제 적용하여 섞는 도중 컵 터치를 원천 차단함.
 
 ### 2. 네트워크 및 Supabase 장애 대비 (폴백 메커니즘)
 - Supabase 연결 실패 또는 네트워크 오류 발생 시 게임 플레이가 중단되지 않도록 로컬스토리지(`localStorage.getItem('cup_best_score')`)에 최고 점수를 자동 백업 저장.
-- 랭킹 불러오기 실패 시 친절한 안내 메시지("랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")와 '재시도' 버튼 노출.
+- 랭킹 데이터 로딩 실패 시 에러 안내 문구("랭킹을 불러오지 못했습니다. 네트워크를 확인해주세요.")와 '다시 시도' 버튼을 표시.
 
 ### 3. 모바일/터치 접근성
-- 컵 카드의 최소 터치 영역을 80px × 110px 이상 확보하여 스마트폰 터치 오동작 방지.
+- 컵 카드의 최소 터치 영역을 80px × 110px 이상 확보하여 스마트폰 터치 시 조작 실수를 방지.
 - 가로 스크롤 방지(`overflow-x-hidden`) 및 모바일 세로 뷰에 맞춰 컵 간격 자동 축소(CSS Flex / Grid gap 조절).
 
 ## 변경 이력
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v20 | 2026. 10. 29. 14시 14분 48초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 스타일, 섞기 애니메이션 궤적 보장, 점수 기록 저장 버튼 1회 비활성화 규칙, Supabase 연동 스펙 및 테스트 시나리오를 최종 확정했습니다. |
+| v19 | 2026. 10. 29. 14시 10분 39초 | 게임 종료 후 점수 기록 저장이 완료되면 '기록 저장' 버튼이 비활성화(disabled)되고 다음 게임 종료 시까지 재제출을 차단하도록 기능/화면/테스트 명세 반영 |
 | v18 | 2026. 10. 29. 13시 41분 21초 | 최종 감수: 최종 개발을 위해 컵 이동 애니메이션 기술 명세(슬롯 기반 좌표 전환)와 에러 대응 품질 기준을 보강하고 개발 착수 상태로 전환했습니다. |
 | v17 | 2026. 10. 29. 13시 39분 51초 | 온라인 실시간 랭킹 시스템을 위한 Supabase DB 연동 규격 및 게임 오버 시 닉네임 등록 플로우 반영 |
 | v16 | 2026. 10. 29. 13시 26분 17초 | 플레이어 닉네임 입력 및 TOP 5 리더보드(명예의 전당) 기록·경쟁 기능 요구사항 반영 |

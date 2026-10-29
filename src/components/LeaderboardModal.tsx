@@ -88,7 +88,7 @@ export default function LeaderboardModal({
         ) : error ? (
           <div className="py-8 text-center space-y-4">
             <p className="text-pink-600 font-medium text-sm">
-              랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+              {error}
             </p>
             <button
               type="button"
@@ -96,7 +96,7 @@ export default function LeaderboardModal({
               className="inline-flex items-center gap-1.5 bg-pink-400 hover:bg-pink-500 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
-              <span>재시도</span>
+              <span>다시 시도</span>
             </button>
           </div>
         ) : scores.length === 0 ? (

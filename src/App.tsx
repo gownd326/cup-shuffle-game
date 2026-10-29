@@ -28,13 +28,14 @@ export default function App() {
   const [revealedCupIds, setRevealedCupIds] = useState<string[]>([]);
   const [currentSwapDuration, setCurrentSwapDuration] = useState<number>(750);
 
-  // Modal states
+  // Modal and score saving states
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false);
   const [leaderboardScores, setLeaderboardScores] = useState<ScoreRecord[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [highlightedRecordId, setHighlightedRecordId] = useState<string | null>(null);
   const [isSavingScore, setIsSavingScore] = useState<boolean>(false);
+  const [isScoreSaved, setIsScoreSaved] = useState<boolean>(false);
 
   // Active run cancel guard
   const isPlayingRef = useRef<boolean>(false);
@@ -64,7 +65,7 @@ export default function App() {
         setTopScore(top5[0].score);
       }
     } catch {
-      setLeaderboardError('랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setLeaderboardError('랭킹을 불러오지 못했습니다. 네트워크를 확인해주세요.');
     } finally {
       setIsLoadingLeaderboard(false);
     }
@@ -186,6 +187,7 @@ export default function App() {
     setLevel(1);
     setScore(0);
     setHighlightedRecordId(null);
+    setIsScoreSaved(false); // Reset saved flag on new game start
     runRound(1);
   };
 
@@ -251,6 +253,7 @@ export default function App() {
     try {
       const savedRecord = await insertGameScore(nickname, score, level);
       setHighlightedRecordId(savedRecord.id);
+      setIsScoreSaved(true); // Disable button & input immediately per SPEC
 
       // Refresh leaderboard & update top score
       const top5 = await fetchTop5Scores();
@@ -294,9 +297,10 @@ export default function App() {
         isOpen={gameState === 'GAME_OVER'}
         score={score}
         level={level}
+        isScoreSaved={isScoreSaved}
+        isSaving={isSavingScore}
         onSaveScore={handleSaveScore}
         onRestart={handleStartGame}
-        isSaving={isSavingScore}
       />
 
       {/* 실시간 명예의 전당 TOP 5 모달 */}

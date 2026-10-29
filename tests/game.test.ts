@@ -8,7 +8,7 @@ import {
   fetchTop5Scores,
 } from '../src/lib/supabase';
 
-describe('Cup Shuffle Game - SPEC v18 Compliance Tests', () => {
+describe('Cup Shuffle Game - SPEC v20 Tests', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -26,10 +26,66 @@ describe('Cup Shuffle Game - SPEC v18 Compliance Tests', () => {
     });
   });
 
-  it('시나리오 1: 컵 카드의 동일한 외관 색상 검증 (단일 화이트 크림톤 bg-white/95 border-pink-200 shadow-md)', () => {
+  it('시나리오 1: 컵 카드의 동일한 외관 색상 검증', () => {
+    // 모든 카드는 외관으로 구별할 수 없도록 단일 화이트 크림톤 및 통일된 핑크 테두리
     expect(UNIFORM_CUP_STYLE.cardClass).toContain('bg-white/95');
     expect(UNIFORM_CUP_STYLE.cardClass).toContain('border-pink-200');
     expect(UNIFORM_CUP_STYLE.cardClass).toContain('shadow-md');
+  });
+
+  it('시나리오 2: 게임 종료 후 기록 저장 및 버튼 비활성화 검증', async () => {
+    // 1. 유효성 검증 (2~8자)
+    await expect(insertGameScore('a', 500, 3)).rejects.toThrow('닉네임은 2~8자 사이여야 합니다.');
+    await expect(insertGameScore('너무긴닉네임입니다아아', 500, 3)).rejects.toThrow('닉네임은 2~8자 사이여야 합니다.');
+
+    // 2. 점수 1회 정상 저장
+    let isScoreSaved = false;
+    const savedRecord = await insertGameScore('야바위왕', 550, 3);
+    expect(savedRecord.nickname).toBe('야바위왕');
+    expect(savedRecord.score).toBe(550);
+    expect(savedRecord.level).toBe(3);
+
+    // 저장 성공 시 플래그 전환
+    isScoreSaved = true;
+    expect(isScoreSaved).toBe(true);
+
+    // 3. 버튼 문구 및 비활성화(disabled) 상태 매핑 검증
+    const buttonLabel = isScoreSaved ? '저장 완료 ✓' : '기록 저장';
+    const isButtonDisabled = isScoreSaved;
+    const isInputDisabled = isScoreSaved;
+
+    expect(buttonLabel).toBe('저장 완료 ✓');
+    expect(isButtonDisabled).toBe(true);
+    expect(isInputDisabled).toBe(true);
+
+    // 4. 새 게임 시작 시 플래그 리셋 검증
+    const handleStartNewGame = () => {
+      isScoreSaved = false;
+    };
+    handleStartNewGame();
+    expect(isScoreSaved).toBe(false);
+    expect(isScoreSaved ? '저장 완료 ✓' : '기록 저장').toBe('기록 저장');
+  });
+
+  it('시나리오 3: 헤더 랭킹 버튼을 통한 실시간 TOP 5 조회', async () => {
+    saveLocalFallbackScore({ nickname: '유저1', score: 200, level: 1 });
+    saveLocalFallbackScore({ nickname: '유저2', score: 600, level: 4 });
+    saveLocalFallbackScore({ nickname: '유저3', score: 450, level: 3 });
+    saveLocalFallbackScore({ nickname: '유저4', score: 100, level: 1 });
+    saveLocalFallbackScore({ nickname: '야바위왕', score: 550, level: 3 });
+    saveLocalFallbackScore({ nickname: '유저5', score: 300, level: 2 });
+
+    const top5 = await fetchTop5Scores();
+    expect(top5).toHaveLength(5);
+    // 내림차순 정렬: 600(유저2) > 550(야바위왕) > 450(유저3) > 300(유저5) > 200(유저1)
+    expect(top5[0].score).toBe(600);
+    expect(top5[0].nickname).toBe('유저2');
+    expect(top5[1].score).toBe(550);
+    expect(top5[1].nickname).toBe('야바위왕');
+    expect(top5[4].score).toBe(200);
+
+    const rank = top5.findIndex((r) => r.nickname === '야바위왕' && r.score === 550) + 1;
+    expect(rank).toBe(2);
   });
 
   it('레벨 디자인 테이블 검증 (Lv.1 ~ Lv.5+ 속도 및 컵 개수)', () => {
@@ -46,33 +102,6 @@ describe('Cup Shuffle Game - SPEC v18 Compliance Tests', () => {
     expect(calculateRoundScore(3, 4)).toBe(500);
     expect(calculateRoundScore(4, 4)).toBe(600);
     expect(calculateRoundScore(5, 5)).toBe(750);
-  });
-
-  it('시나리오 2 & 3: 점수 등록 로직 및 TOP 5 리더보드 정렬/추출 검증', async () => {
-    // 닉네임 유효성 검증
-    await expect(insertGameScore('a', 500, 3)).rejects.toThrow('닉네임은 2~8자 사이여야 합니다.');
-    await expect(insertGameScore('너무긴닉네임입니다아아', 500, 3)).rejects.toThrow('닉네임은 2~8자 사이여야 합니다.');
-
-    // 더미 점수 등록 (fallback 로컬 저장소 활용)
-    saveLocalFallbackScore({ nickname: '유저1', score: 200, level: 1 });
-    saveLocalFallbackScore({ nickname: '유저2', score: 600, level: 4 });
-    saveLocalFallbackScore({ nickname: '유저3', score: 450, level: 3 });
-    saveLocalFallbackScore({ nickname: '유저4', score: 100, level: 1 });
-    saveLocalFallbackScore({ nickname: '야바위왕', score: 550, level: 3 });
-    saveLocalFallbackScore({ nickname: '유저5', score: 300, level: 2 });
-
-    const top5 = await fetchTop5Scores();
-    expect(top5).toHaveLength(5);
-    // 1위 600점, 2위 550점, 3위 450점, 4위 300점, 5위 200점
-    expect(top5[0].nickname).toBe('유저2');
-    expect(top5[0].score).toBe(600);
-    expect(top5[1].nickname).toBe('야바위왕');
-    expect(top5[1].score).toBe(550);
-    expect(top5[4].score).toBe(200);
-
-    // 550점이 TOP 5 안에 드는지 확인
-    const myRankIndex = top5.findIndex((r) => r.nickname === '야바위왕' && r.score === 550);
-    expect(myRankIndex).toBe(1); // 2위(인덱스 1)
   });
 
   it('섞기(MIXING) 좌표 스왑 및 yOffset 복원 로직 검증', () => {

@@ -4,18 +4,20 @@ interface GameOverModalProps {
   isOpen: boolean;
   score: number;
   level: number;
+  isScoreSaved: boolean;
+  isSaving: boolean;
   onSaveScore: (nickname: string) => Promise<void>;
   onRestart: () => void;
-  isSaving: boolean;
 }
 
 export default function GameOverModal({
   isOpen,
   score,
   level,
+  isScoreSaved,
+  isSaving,
   onSaveScore,
   onRestart,
-  isSaving,
 }: GameOverModalProps) {
   const [nickname, setNickname] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -24,6 +26,8 @@ export default function GameOverModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isScoreSaved || isSaving) return;
+
     const trimmed = nickname.trim();
     if (trimmed.length < 2 || trimmed.length > 8) {
       setErrorMessage('닉네임은 2~8자 사이여야 합니다.');
@@ -37,6 +41,8 @@ export default function GameOverModal({
       setErrorMessage(msg);
     }
   };
+
+  const isInputDisabled = isSaving || isScoreSaved;
 
   return (
     <div
@@ -82,16 +88,28 @@ export default function GameOverModal({
               onChange={(e) => setNickname(e.target.value)}
               placeholder="닉네임 입력 (2~8자)"
               maxLength={8}
-              disabled={isSaving}
-              className="flex-1 px-4 py-2.5 rounded-xl border-2 border-pink-200 focus:border-pink-400 focus:outline-none text-slate-700 text-sm bg-white"
+              disabled={isInputDisabled}
+              className={`flex-1 px-4 py-2.5 rounded-xl border-2 border-pink-200 focus:border-pink-400 focus:outline-none text-slate-700 text-sm transition-colors ${
+                isScoreSaved ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'
+              }`}
             />
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="bg-pink-400 hover:bg-pink-500 text-white font-bold py-2.5 px-5 rounded-xl disabled:opacity-50 cursor-pointer text-sm whitespace-nowrap transition-all"
-            >
-              {isSaving ? '저장 중...' : '기록 저장'}
-            </button>
+            {isScoreSaved ? (
+              <button
+                type="button"
+                disabled={true}
+                className="bg-slate-300 text-slate-500 font-bold py-2.5 px-5 rounded-xl cursor-not-allowed text-sm whitespace-nowrap"
+              >
+                저장 완료 ✓
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="bg-pink-400 hover:bg-pink-500 text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer text-sm whitespace-nowrap transition-all disabled:opacity-50"
+              >
+                {isSaving ? '저장 중...' : '기록 저장'}
+              </button>
+            )}
           </div>
           {errorMessage && (
             <p className="text-xs text-red-500 font-semibold">{errorMessage}</p>
