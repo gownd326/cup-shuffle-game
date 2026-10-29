@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 화면·UI 설계
 
-> 문서 버전 v20 · 완성도 100% · 마지막 수정 2026. 10. 29. 14시 32분 54초
+> 문서 버전 v22 · 완성도 100% · 마지막 수정 2026. 10. 29. 17시 4분 22초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -15,55 +15,64 @@
 
 ## 1. 화면과 주소(URL) 구성
 
-### 1. 화면 구성
-- 단일 페이지 앱 (`/`) 구조
-
-### 2. 플레이 영역 상세 구성
+### 1. 화면 구조 및 반응형 레이아웃
+- **메인 컨테이너**: `min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 flex flex-col justify-between items-center p-4 selection:bg-pink-200 select-none overflow-x-hidden`
 - **상단 헤더 (`Header.tsx`)**:
-  - 타이틀: `도전! 컵 섞기 야바위 게임 🥤`
-  - 정보 대시보드: [현재 점수: 0] / [전체 1위 점수: 2500] / [현재 레벨: Lv.1]
-  - 우측 액션: '🏆 랭킹 보기' 버튼 (클릭 시 언제든지 온라인 실시간 TOP 5 모달 조회 가능)
-- **상태 안내 말풍선 (`StatusAlert.tsx`)**:
-  - `IDLE`: "'게임 시작' 버튼을 눌러 도전하세요! 🎯"
-  - `PREVIEW`: "공이 숨겨진 컵을 잘 기억해두세요! 👁️"
-  - `MIXING`: "샤샤샥- 섞이는 중! 컵의 움직임을 끝까지 쫓아가세요! 👀"
-  - `CHOOSING`: "공이 들어있는 컵을 터치해보세요! 👆"
-  - `ROUND_CLEAR`: "정답입니다! 다음 라운드로 출발! 🎉"
-  - `GAME_OVER`: "아쉽네요! 점수를 등록하고 전 세계 랭킹을 확인해보세요! 😢"
-- **컵 플레이 스테이지 (`GameBoard.tsx`)**:
-  - 컵 컨테이너: 가로 최대 600px의 상대좌표 영역
-  - 컵 카드 본체 (`CupItem.tsx`): 모든 카드는 완전히 동일한 단일 화이트 크림톤 스타일(`bg-white/95 border-2 border-pink-200 shadow-md`)을 유지
-- **게임 오버 & 점수 등록 모달 (`GameOverModal.tsx`)**:
-  - **상단**: 최종 획득 점수 및 도달 레벨 표시
-  - **닉네임 등록 폼**:
-    - 인풋창: 플레이스홀더 `닉네임 입력 (2~8자)`. 기록 저장 완료 시 `disabled` 및 `bg-slate-100` 스타일 적용.
-    - 기록 저장 버튼:
-      - 저장 전(활성): 문구 `기록 저장`, 스타일 `bg-pink-400 hover:bg-pink-500 text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer`
-      - 저장 완료 후(비활성): 문구 `저장 완료 ✓`, 스타일 `bg-slate-300 text-slate-500 font-bold py-2.5 px-5 rounded-xl cursor-not-allowed` (`disabled={true}` 적용)
-  - **하단 액션**: '다시 도전하기' 버튼 (클릭 시 모달이 닫히며 신규 게임 초기화, `isScoreSaved` 상태도 초기화)
+  - 타이틀: `도전! 컵 섞기 야바위 게임 🥤` (중앙 정렬 또는 반응형 flex 배치)
+  - 상태 패널: 현재 점수(`Score: N`), 전체 1위 점수(`Best: M`), 현재 레벨(`Lv.K`)
+  - 우측 액션: `🏆 랭킹 보기` 버튼 (클릭 시 LeaderboardModal 노출)
+- **게임 영역 (`GameBoard.tsx`)**:
+  - 안내 배너: 게임 상태(`IDLE`: "게임 시작 버튼을 눌러주세요!", `PREVIEW`: "공의 위치를 잘 기억하세요!", `MIXING`: "컵이 움직이는 곳을 집중해서 보세요!", `CHOOSING`: "공이 숨겨진 컵을 골라보세요!")
+  - 컵 보드 컨테이너: 가로 최대 600px, 컵 개수에 따른 동적 가로폭 및 높이 220px 영역 확보
+  - 컵 카드(`CupItem.tsx`): 각 카드는 절대 위치(`absolute`) 또는 인라인 트랜스폼(`translateX`)으로 슬롯 간 이동. 동일한 순백 크림톤 배경(`bg-white/95`)과 핑크 테두리(`border-2 border-pink-200`)로 완전히 일관된 외형을 가짐.
+  - 공 컴포넌트(`Ball`): 정답 컵 위치 아래에 붉은 구슬(🔴) 그래픽 배치, 컵이 위로 들렸을 때만 시각적으로 노출.
+- **모달 레이어**:
+  - **`GameOverModal.tsx`**: 게임 종료 시 배경 딤 처리(`fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50`).
+    - 타이틀: "아쉽네요! 게임 종료 🥺"
+    - 점수 표시: "최종 점수: {score}점 | 클리어 레벨: Lv.{level}"
+    - 닉네임 입력: `input` (2~8자, `disabled={isScoreSaved}`)
+    - 저장 버튼: `<button disabled={isScoreSaved}>{isScoreSaved ? '저장 완료 ✓' : '기록 저장'}</button>`
+    - 재도전 버튼: `<button onClick={restartGame}>다시 도전하기 🔄</button>`
+  - **`LeaderboardModal.tsx`**: 상단 랭킹 버튼 클릭 시 노출되는 TOP 5 랭킹 팝업.
+    - 상위 1위~5위 순위, 닉네임, 점수, 달성일시 표시.
 
 ## 2. 디자인 가이드
 
 ### 1. 아기자기한 컬러 팔레트 (Tailwind 기준)
 - 배경색 (파스텔 그라데이션): `bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100` (`#FCE7F3`, `#F3E8FF`, `#E0F2FE`)
 - 카드/패널 배경: 화이트 계열 반투명 `bg-white/80 backdrop-blur-md border border-pink-100`
-- **컵 카드 단일 통일 색상**: 컵을 감싸는 모든 카드는 동일하게 순백 크림톤(`bg-white/95`, `#FAFAFA`) 및 통일된 핑크 테두리(`border-pink-200`, `#FBCFE8`)를 적용하여 컵 외관 색상만으로 위치를 눈치챌 수 없도록 통일.
+- **컵 카드 단일 통일 색상**: 컵을 감싸는 모든 카드는 동일하게 순백 크림톤(`bg-white/95`, `#FAFAFA`) 및 통일된 핑크 테두리(`border-pink-200`, `#FBCFE8`)를 적용하여 컵 외관 색상만으로 위치를 눈치챌 수 없도록 통일. `CupItem.tsx`에서는 아래 클래스를 사용한다.
+  ```tsx
+  <div className="w-20 h-30 rounded-2xl bg-white/95 border-2 border-pink-200 shadow-md flex items-center justify-center">
+    {/* 컵 이모지 */}
+  </div>
+  ```
 - 강조 색상 (귀여운 핑크/퍼플): 메인 버튼 `bg-pink-400 hover:bg-pink-500` (`#F472B6`), 보조 버튼 `bg-purple-400 hover:bg-purple-500` (`#C084FC`)
 - 텍스트 기본: 진한 보라/회색 `text-slate-700` (`#334155`)
 - 텍스트 보조: `text-slate-500` (`#64748B`)
 
 ### 2. 컴포넌트 스타일 규칙
-- **모서리(Border-radius)**: 모든 카드, 버튼, 팝업창은 둥글둥글하게 처리 (`rounded-2xl`, `rounded-full` 적극 활용).
+- **모서리(Border-radius)**: 모든 카드, 버튼, 팝업창은 둥글둥글하게 처리 (`rounded-2xl`, `rounded-full`), 
 - **그림자 및 입체감**: 부드러운 그림자(`shadow-lg`, `shadow-pink-200/50`)를 주어 몽글몽글한 느낌 연출.
 - **컵 카드 균일화**: 컵 카드의 크기, 배경색, 그림자, 테두리, 내부 컵 이모지(🥤) 스타일을 모든 슬롯에서 100% 동일하게 렌더링.
+- **접근성**: 최소 터치 영역 `w-20 h-28`(≈80 × 112 px) 확보.
 
 ### 3. 타이포그래피
-- 폰트 가족: 둥근고딕 계열의 시스템 폰트 우선 적용 (`font-sans`, 둥근 느낌의 Sans-serif).
+- 폰트 가족: 둥근고딕 계열의 시스템 폰트 우선 적용 (`font-sans`).
+
+### 4. 반응형 레이아웃
+- **게임보드 컨테이너**: `max-w-[600px] w-full mx-auto p-4 flex flex-wrap justify-center gap-4`.
+- **PC(≥640 px)**: `flex-wrap: nowrap`, `gap-4` 유지, 컵 카드 3~5개를 한 줄에 배치.
+- **모바일( <640 px)**: `flex-wrap: wrap`, 각 컵 카드 가로폭 `w-1/4`, `max-w-xs`; `gap-2`로 간격을 줄이고 `justify-center`로 중앙 정렬.
+- **텍스트 및 버튼**: `text-base` → `text-sm`으로 축소, `p-2` → `p-1`으로 패딩 축소.
+- Tailwind의 `sm:`/`md:` 프리픽스를 활용해 위 클래스들을 조합한다.
 
 ## 변경 이력
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v22 | 2026. 10. 29. 17시 0분 16초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 및 애니메이션 궤적 보장, Supabase 랭킹 중복 저장 방지, 모바일/PC 반응형 레이아웃 일관성 검증 및 개발 착수 준비 완료 |
+| v21 | 2026. 10. 29. 16시 8분 19초 | 업데이트: 컵 카드 색상 일관화 및 PC·모바일에서 자연스러운 레이아웃 반영 |
 | v20 | 2026. 10. 29. 14시 14분 48초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 스타일, 섞기 애니메이션 궤적 보장, 점수 기록 저장 버튼 1회 비활성화 규칙, Supabase 연동 스펙 및 테스트 시나리오를 최종 확정했습니다. |
 | v19 | 2026. 10. 29. 14시 10분 39초 | 게임 종료 후 점수 기록 저장이 완료되면 '기록 저장' 버튼이 비활성화(disabled)되고 다음 게임 종료 시까지 재제출을 차단하도록 기능/화면/테스트 명세 반영 |
 | v18 | 2026. 10. 29. 13시 41분 21초 | 최종 감수: 최종 개발을 위해 컵 이동 애니메이션 기술 명세(슬롯 기반 좌표 전환)와 에러 대응 품질 기준을 보강하고 개발 착수 상태로 전환했습니다. |

@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 개발 문서
 
-> 문서 버전 v20 · 완성도 100% · 마지막 수정 2026. 10. 29. 14시 32분 54초
+> 문서 버전 v22 · 완성도 100% · 마지막 수정 2026. 10. 29. 17시 4분 22초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -47,30 +47,31 @@
 
 ### 1. 게임 진행 로직
 - **상태 정의 (`gameState`)**
-  - `IDLE`: 게임 시작 대기 중 (상단에 '게임 시작' 버튼 및 'TOP 5 랭킹' 버튼 노출)
-  - `PREVIEW`: 시작 직후 공이 든 정답 컵 카드가 위로 들리며(`translateY(-50px)`) 1.5초간 공의 위치를 사용자에게 노출
-  - `MIXING`: 컵이 닫힌 뒤 무작위 두 컵의 슬롯 위치를 순차적으로 교환하는 단계
-    - 각 컵은 고유 `id`를 유지하며, 현재 위치 인덱스(`slotIndex`)에 따라 계산된 `translateX(${slotIndex * slotWidth}px)`를 CSS `transition: transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`로 부드럽게 이동시킴.
+  - `IDLE`: 게임 시작 대기 중 (상단에 '게임 시작' 버튼 및 '🏆 랭킹 보기' 버튼 노출)
+  - `PREVIEW`: 시작 직후 공이 든 정답 컵 카드가 위로 들리며(`translateY(-50px)`) 1.5초간 공의 위치를 사용자에게 확실하게 보여준 후 내려옴
+  - `MIXING`: 컵이 완전히 닫힌 뒤 무작위 두 컵의 슬롯 위치를 순차적으로 교환하는 단계
+    - 각 컵은 고유 `id`(`cup-0`, `cup-1`, `cup-2` 등)를 유지하며, 현재 배치된 슬롯 위치(`slotIndex`)에 따라 계산된 `translateX(${slotIndex * slotWidth}px)`를 CSS `transition: transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`로 부드럽게 이동시킴.
+    - 컵 요소는 재마운트되지 않고 동일 DOM 노드에서 `transform` 좌표만 변경되므로 눈으로 이동 궤적을 실시간 추적 가능.
     - 이동 중에는 사용자 터치/클릭을 원천 차단 (`pointer-events: none`).
   - `CHOOSING`: 모든 섞기 과정이 끝나고 사용자가 컵 하나를 고를 수 있는 단계 (`pointer-events: auto`)
-  - `REVEAL`: 클릭한 컵이 위로 열리며 정답 확인 (성공 시 `ROUND_CLEAR`, 실패 시 정답 컵까지 추가로 열리며 `GAME_OVER`)
-  - `ROUND_CLEAR`: 축하 이펙트 노출 후 점수 누적, 1.2초 후 다음 레벨 섞기 준비
-  - `GAME_OVER`: 최종 점수 확인 팝업 노출, 닉네임 입력 폼 제공 및 Supabase DB 점수 저장 후 TOP 5 리더보드 노출
+  - `REVEAL`: 클릭한 컵이 위로 열리며(`translateY(-40px)`) 정답 확인 (성공 시 `ROUND_CLEAR`, 실패 시 클릭한 컵과 실제 정답 컵이 함께 열리며 `GAME_OVER`)
+  - `ROUND_CLEAR`: 정답 효과음 및 점수 누적 처리, 1.2초 후 다음 레벨 자동 준비
+  - `GAME_OVER`: 오답 효과음 발생 후 게임 오버 모달 표시, 최종 점수 확인 및 Supabase 점수 저장 UI 제공
 
 ### 2. 레벨 디자인 (눈으로 확실히 추적 가능한 속도 설정)
-| 레벨 | 컵 개수 | 교환 횟수 | 1회 교환 이동시간(ms) | 교환 간 대기(ms) | 특징 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Lv.1 | 3개 | 4회 | 750ms | 250ms | 큼직하고 여유로운 이동 |
-| Lv.2 | 3개 | 6회 | 650ms | 200ms | 자연스러운 속도감 |
-| Lv.3 | 4개 | 7회 | 550ms | 150ms | 컵 4개 확장, 눈동자 집중 |
-| Lv.4 | 4개 | 9회 | 480ms | 120ms | 난이도 상승 |
-| Lv.5+ | 5개 | 10회 | 420ms | 100ms | 최고 난이도 도전 |
+| 레벨 | 컵 개수 | 교환 횟수 | 1회 교환 이동시간(ms) | 교환 간 대기(ms) | 슬롯 너비(slotWidth) | 특징 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Lv.1 | 3개 | 4회 | 750ms | 250ms | 100px (모바일 70px) | 큼직하고 여유로운 이동 |
+| Lv.2 | 3개 | 6회 | 650ms | 200ms | 100px (모바일 70px) | 자연스러운 속도감 |
+| Lv.3 | 4개 | 7회 | 550ms | 150ms | 90px (모바일 62px) | 컵 4개 확장, 집중 필요 |
+| Lv.4 | 4개 | 9회 | 480ms | 120ms | 90px (모바일 62px) | 빠른 추적 난이도 |
+| Lv.5+ | 5개 | 10회 | 420ms | 100ms | 80px (모바일 55px) | 최고 난이도 도전 |
 
 ### 3. 온라인 점수 계산 및 실시간 랭킹보드(TOP 5) 시스템
 - **점수 산출 공식**: 라운드 통과 시 획득 점수 = `(현재 레벨 × 100) + (잔여 컵 개수 × 50)`
 - **점수 등록 절차 및 중복 등록 차단 규칙**:
-  1. 플레이어가 오답을 고르면 `GAME_OVER` 팝업 발생 (등록 상태 플래그 `isScoreSaved = false`).
-  2. 팝업에서 최종 점수와 레벨을 확인한 뒤 닉네임(2~8자)을 입력하고 '기록 저장' 버튼 클릭.
+  1. 플레이어가 오답을 고르면 `GAME_OVER` 모달 발생 (`isScoreSaved = false`).
+  2. 모달에서 최종 점수와 레벨을 확인한 뒤 닉네임(2~8자)을 입력하고 '기록 저장' 버튼 클릭.
   3. Supabase `game_scores` 테이블에 새 레코드 삽입(`INSERT`).
   4. 저장이 성공하면 `isScoreSaved = true`로 상태가 전환되며 **'기록 저장' 버튼이 즉시 비활성화(`disabled`)**되고 버튼 문구가 `'저장 완료 ✓'`로 변경됨.
   5. 닉네임 입력창도 `disabled` 처리되며, 플레이어가 '다시 도전하기'를 누르고 새로운 게임을 플레이하여 다시 `GAME_OVER` 상태에 도달할 때까지 비활성화 상태가 유지됨.
@@ -78,32 +79,26 @@
 
 ## 4. 화면과 주소(URL) 구성
 
-### 1. 화면 구성
-- 단일 페이지 앱 (`/`) 구조
-
-### 2. 플레이 영역 상세 구성
+### 1. 화면 구조 및 반응형 레이아웃
+- **메인 컨테이너**: `min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 flex flex-col justify-between items-center p-4 selection:bg-pink-200 select-none overflow-x-hidden`
 - **상단 헤더 (`Header.tsx`)**:
-  - 타이틀: `도전! 컵 섞기 야바위 게임 🥤`
-  - 정보 대시보드: [현재 점수: 0] / [전체 1위 점수: 2500] / [현재 레벨: Lv.1]
-  - 우측 액션: '🏆 랭킹 보기' 버튼 (클릭 시 언제든지 온라인 실시간 TOP 5 모달 조회 가능)
-- **상태 안내 말풍선 (`StatusAlert.tsx`)**:
-  - `IDLE`: "'게임 시작' 버튼을 눌러 도전하세요! 🎯"
-  - `PREVIEW`: "공이 숨겨진 컵을 잘 기억해두세요! 👁️"
-  - `MIXING`: "샤샤샥- 섞이는 중! 컵의 움직임을 끝까지 쫓아가세요! 👀"
-  - `CHOOSING`: "공이 들어있는 컵을 터치해보세요! 👆"
-  - `ROUND_CLEAR`: "정답입니다! 다음 라운드로 출발! 🎉"
-  - `GAME_OVER`: "아쉽네요! 점수를 등록하고 전 세계 랭킹을 확인해보세요! 😢"
-- **컵 플레이 스테이지 (`GameBoard.tsx`)**:
-  - 컵 컨테이너: 가로 최대 600px의 상대좌표 영역
-  - 컵 카드 본체 (`CupItem.tsx`): 모든 카드는 완전히 동일한 단일 화이트 크림톤 스타일(`bg-white/95 border-2 border-pink-200 shadow-md`)을 유지
-- **게임 오버 & 점수 등록 모달 (`GameOverModal.tsx`)**:
-  - **상단**: 최종 획득 점수 및 도달 레벨 표시
-  - **닉네임 등록 폼**:
-    - 인풋창: 플레이스홀더 `닉네임 입력 (2~8자)`. 기록 저장 완료 시 `disabled` 및 `bg-slate-100` 스타일 적용.
-    - 기록 저장 버튼:
-      - 저장 전(활성): 문구 `기록 저장`, 스타일 `bg-pink-400 hover:bg-pink-500 text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer`
-      - 저장 완료 후(비활성): 문구 `저장 완료 ✓`, 스타일 `bg-slate-300 text-slate-500 font-bold py-2.5 px-5 rounded-xl cursor-not-allowed` (`disabled={true}` 적용)
-  - **하단 액션**: '다시 도전하기' 버튼 (클릭 시 모달이 닫히며 신규 게임 초기화, `isScoreSaved` 상태도 초기화)
+  - 타이틀: `도전! 컵 섞기 야바위 게임 🥤` (중앙 정렬 또는 반응형 flex 배치)
+  - 상태 패널: 현재 점수(`Score: N`), 전체 1위 점수(`Best: M`), 현재 레벨(`Lv.K`)
+  - 우측 액션: `🏆 랭킹 보기` 버튼 (클릭 시 LeaderboardModal 노출)
+- **게임 영역 (`GameBoard.tsx`)**:
+  - 안내 배너: 게임 상태(`IDLE`: "게임 시작 버튼을 눌러주세요!", `PREVIEW`: "공의 위치를 잘 기억하세요!", `MIXING`: "컵이 움직이는 곳을 집중해서 보세요!", `CHOOSING`: "공이 숨겨진 컵을 골라보세요!")
+  - 컵 보드 컨테이너: 가로 최대 600px, 컵 개수에 따른 동적 가로폭 및 높이 220px 영역 확보
+  - 컵 카드(`CupItem.tsx`): 각 카드는 절대 위치(`absolute`) 또는 인라인 트랜스폼(`translateX`)으로 슬롯 간 이동. 동일한 순백 크림톤 배경(`bg-white/95`)과 핑크 테두리(`border-2 border-pink-200`)로 완전히 일관된 외형을 가짐.
+  - 공 컴포넌트(`Ball`): 정답 컵 위치 아래에 붉은 구슬(🔴) 그래픽 배치, 컵이 위로 들렸을 때만 시각적으로 노출.
+- **모달 레이어**:
+  - **`GameOverModal.tsx`**: 게임 종료 시 배경 딤 처리(`fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50`).
+    - 타이틀: "아쉽네요! 게임 종료 🥺"
+    - 점수 표시: "최종 점수: {score}점 | 클리어 레벨: Lv.{level}"
+    - 닉네임 입력: `input` (2~8자, `disabled={isScoreSaved}`)
+    - 저장 버튼: `<button disabled={isScoreSaved}>{isScoreSaved ? '저장 완료 ✓' : '기록 저장'}</button>`
+    - 재도전 버튼: `<button onClick={restartGame}>다시 도전하기 🔄</button>`
+  - **`LeaderboardModal.tsx`**: 상단 랭킹 버튼 클릭 시 노출되는 TOP 5 랭킹 팝업.
+    - 상위 1위~5위 순위, 닉네임, 점수, 달성일시 표시.
 
 ## 5. 데이터 모델
 
@@ -143,29 +138,42 @@
 ### 1. 아기자기한 컬러 팔레트 (Tailwind 기준)
 - 배경색 (파스텔 그라데이션): `bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100` (`#FCE7F3`, `#F3E8FF`, `#E0F2FE`)
 - 카드/패널 배경: 화이트 계열 반투명 `bg-white/80 backdrop-blur-md border border-pink-100`
-- **컵 카드 단일 통일 색상**: 컵을 감싸는 모든 카드는 동일하게 순백 크림톤(`bg-white/95`, `#FAFAFA`) 및 통일된 핑크 테두리(`border-pink-200`, `#FBCFE8`)를 적용하여 컵 외관 색상만으로 위치를 눈치챌 수 없도록 통일.
+- **컵 카드 단일 통일 색상**: 컵을 감싸는 모든 카드는 동일하게 순백 크림톤(`bg-white/95`, `#FAFAFA`) 및 통일된 핑크 테두리(`border-pink-200`, `#FBCFE8`)를 적용하여 컵 외관 색상만으로 위치를 눈치챌 수 없도록 통일. `CupItem.tsx`에서는 아래 클래스를 사용한다.
+  ```tsx
+  <div className="w-20 h-30 rounded-2xl bg-white/95 border-2 border-pink-200 shadow-md flex items-center justify-center">
+    {/* 컵 이모지 */}
+  </div>
+  ```
 - 강조 색상 (귀여운 핑크/퍼플): 메인 버튼 `bg-pink-400 hover:bg-pink-500` (`#F472B6`), 보조 버튼 `bg-purple-400 hover:bg-purple-500` (`#C084FC`)
 - 텍스트 기본: 진한 보라/회색 `text-slate-700` (`#334155`)
 - 텍스트 보조: `text-slate-500` (`#64748B`)
 
 ### 2. 컴포넌트 스타일 규칙
-- **모서리(Border-radius)**: 모든 카드, 버튼, 팝업창은 둥글둥글하게 처리 (`rounded-2xl`, `rounded-full` 적극 활용).
+- **모서리(Border-radius)**: 모든 카드, 버튼, 팝업창은 둥글둥글하게 처리 (`rounded-2xl`, `rounded-full`), 
 - **그림자 및 입체감**: 부드러운 그림자(`shadow-lg`, `shadow-pink-200/50`)를 주어 몽글몽글한 느낌 연출.
 - **컵 카드 균일화**: 컵 카드의 크기, 배경색, 그림자, 테두리, 내부 컵 이모지(🥤) 스타일을 모든 슬롯에서 100% 동일하게 렌더링.
+- **접근성**: 최소 터치 영역 `w-20 h-28`(≈80 × 112 px) 확보.
 
 ### 3. 타이포그래피
-- 폰트 가족: 둥근고딕 계열의 시스템 폰트 우선 적용 (`font-sans`, 둥근 느낌의 Sans-serif).
+- 폰트 가족: 둥근고딕 계열의 시스템 폰트 우선 적용 (`font-sans`).
+
+### 4. 반응형 레이아웃
+- **게임보드 컨테이너**: `max-w-[600px] w-full mx-auto p-4 flex flex-wrap justify-center gap-4`.
+- **PC(≥640 px)**: `flex-wrap: nowrap`, `gap-4` 유지, 컵 카드 3~5개를 한 줄에 배치.
+- **모바일( <640 px)**: `flex-wrap: wrap`, 각 컵 카드 가로폭 `w-1/4`, `max-w-xs`; `gap-2`로 간격을 줄이고 `justify-center`로 중앙 정렬.
+- **텍스트 및 버튼**: `text-base` → `text-sm`으로 축소, `p-2` → `p-1`으로 패딩 축소.
+- Tailwind의 `sm:`/`md:` 프리픽스를 활용해 위 클래스들을 조합한다.
 
 ## 7. 기술 스택과 폴더 구조
 
 ### 1. 기술 스택
-- 프레임워크: Vite + React 18 (TypeScript)
-- 백엔드 / 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
-- 스타일링: Tailwind CSS (파스텔 테마 및 CSS Transform 애니메이션)
-- 사운드: Web Audio API (외부 파일 로딩 의존성 없는 브라우저 내장 신디사이저 사운드)
-- 아이콘: Lucide React (Trophy, RefreshCw, Star, Play 등)
+- 프레임워크: Vite (v5.x) + React 18 (TypeScript)
+- 스타일링: Tailwind CSS (파스텔 색상표 커스텀 및 transition 클래스)
+- 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
+- 오디오: Web Audio API (`AudioContext` 기반 브라우저 내장 오실레이터 비프음/클릭음 구현)
+- 아이콘: Lucide React (`Trophy`, `Play`, `RotateCcw`, `Check`, `Award`)
 
-### 2. 프로젝트 디렉토리 구조
+### 2. 프로젝트 디렉토리 및 파일 트리
 ```text
 cup-shuffle-game/
 ├── index.html
@@ -179,26 +187,27 @@ cup-shuffle-game/
     ├── App.tsx
     ├── index.css
     ├── lib/
-    │   └── supabase.ts         # createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+    │   └── supabase.ts         # createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
     ├── types/
-    │   └── game.ts             # GameState, CupItem, LevelConfig, ScoreRecord 타입
+    │   └── game.ts             # GameState, CupItemType, LevelConfig, ScoreRecord 타입 정의
     ├── constants/
-    │   └── levels.ts           # 레벨별 속도, 컵 개수, 섞기 횟수 테이블
+    │   └── levels.ts           # 레벨별 속도(duration), 컵 개수(cupCount), 교환 횟수(shuffleCount)
     ├── utils/
-    │   ├── sound.ts            # Web Audio API 톤 생성기 (정답, 오답, 컵 이동 사운드)
-    │   └── timer.ts            # sleep 비동기 딜레이 헬퍼
+    │   ├── sound.ts            # Web Audio API 톤 생성기 (정답 징글, 실패 톤, 컵 이동 스위시음)
+    │   └── timer.ts            # 비동기 딜레이 sleep 유틸리티
     └── components/
-        ├── Header.tsx           # 현재 점수, 최고 점수, 현재 레벨, 랭킹 보기 버튼
-        ├── StatusAlert.tsx      # 현재 게임 상태 말풍선 UI
+        ├── Header.tsx           # 점수판, 레벨, 랭킹 모달 열기 버튼
+        ├── StatusAlert.tsx      # 상황별 안내 말풍선
         ├── GameBoard.tsx        # 컵 슬롯 좌표 계산 및 translateX 애니메이션 제어
         ├── CupItem.tsx          # 100% 동일한 외관의 컵 카드 그래픽 컴포넌트
-        ├── GameOverModal.tsx    # 점수 확인, 닉네임 등록, 1회 저장 제한 버튼, 재도전 액션
+        ├── GameOverModal.tsx    # 점수 저장(1회 제한) 및 재도전 모달
         └── LeaderboardModal.tsx # 실시간 Supabase TOP 5 리더보드 모달
 ```
 
-### 3. 환경 변수
-- `VITE_SUPABASE_URL`: Supabase 프로젝트 URL (예: `https://xxxx.supabase.co`)
-- `VITE_SUPABASE_ANON_KEY`: Supabase 공개 익명 키 (Anon Key)
+### 3. 환경 변수 설정
+- Vite 클라이언트 환경 변수 (`.env`):
+  - `VITE_SUPABASE_URL`: Supabase 프로젝트 URL
+  - `VITE_SUPABASE_ANON_KEY`: Supabase 공개 익명 키 (Anon Key)
 
 ## 8. 품질 기준 (성능·보안·접근성)
 
@@ -224,28 +233,33 @@ cup-shuffle-game/
 ## 10. 테스트 계획
 
 ### 1. 연기 테스트 (Smoke Test)
-- `GET /`: HTTP 상태 코드 200 정상 로딩 확인
-- 헤더 문구 '도전! 컵 섞기 야바위 게임 🥤', '게임 시작' 버튼, '🏆 랭킹 보기' 버튼 정상 렌더링 확인
+- `GET /`: 상태 코드 200 정상 로딩 확인
+- 헤더 문구 "도전! 컵 섞기 야바위 게임 🥤", 점수 배너, '게임 시작' 버튼 정상 노출 확인
 
-### 2. 수용 기준 및 시나리오
-- **시나리오 1: 컵 카드의 동일한 외관 색상 검증**
-  - **Given** 게임이 시작되어 스테이지에 N개의 컵 카드가 렌더링된다.
-  - **When** 각 컵 카드 요소의 스타일(배경색, 테두리 색상, 그림자, 아이콘 색상)을 검사한다.
-  - **Then** 모든 컵 카드가 인덱스 및 정답 여부와 관계없이 동일한 스타일(`bg-white/95 border-pink-200`)을 유지하여 외관으로 구별할 수 없다.
+### 2. 수용 기준 및 테스트 시나리오
+- **시나리오 1: 컵 카드의 100% 동일한 외관 및 힌트 부재 검증**
+  - **Given** 게임이 시작되어 스테이지에 컵들이 렌더링된다.
+  - **When** 렌더링된 모든 컵 카드의 CSS 속성(배경색 `bg-white/95`, 테두리 `border-pink-200`, 그림자 `shadow-md`, 크기)을 검사한다.
+  - **Then** 모든 컵 카드는 육안으로 식별 가능한 색상/형태 차이가 전혀 없어야 하며, 오직 눈으로 추적한 움직임만으로 정답을 유추할 수 있어야 한다.
 
-- **시나리오 2: 게임 종료 후 기록 저장 및 버튼 비활성화 검증**
-  - **Given** 플레이어가 오답 컵을 선택하여 `GAME_OVER` 모달이 표시된다.
-  - **When** 닉네임 입력창에 '야바위왕'을 입력하고 '기록 저장' 버튼을 1회 누른다.
-  - **Then**
-    1. Supabase `game_scores` 테이블에 레코드가 1회 정상 저장된다.
-    2. '기록 저장' 버튼의 문구가 '저장 완료 ✓'로 바뀌며 `disabled` 상태가 되어 재클릭할 수 없다.
-    3. 닉네임 입력창 역시 `disabled` 상태가 된다.
-    4. 새로운 게임을 시작하여 다시 게임 오버가 되기 전까지 버튼은 계속 비활성화 상태를 유지한다.
+- **시나리오 2: 컵 섞기 시 시각적 궤적 이동 검증**
+  - **Given** 게임 레벨이 시작되어 `PREVIEW`가 종료되고 `MIXING` 상태로 진입한다.
+  - **When** 두 컵의 위치가 교환될 때 각 컵 요소의 DOM 스타일을 확인한다.
+  - **Then** 요소가 언마운트되지 않고 `transform: translateX(...)` 속성이 점진적으로 변경되며, `transition`을 통해 이동 과정이 화면에 시각적으로 부드럽게 표현되어야 한다.
 
-- **시나리오 3: 헤더 랭킹 버튼을 통한 실시간 TOP 5 조회**
-  - **Given** 메인 화면 또는 게임 대기 상태이다.
-  - **When** 상단 헤더의 '🏆 랭킹 보기' 버튼을 클릭한다.
-  - **Then** Supabase DB에서 최신 TOP 5 랭킹 목록을 불러와 모달에 정상 표시한다.
+- **시나리오 3: 게임 오버 후 점수 등록 및 버튼 1회 비활성화 검증**
+  - **Given** 플레이어가 오답 컵을 선택하여 `GAME_OVER` 모달이 팝업된다.
+  - **When** 닉네임 입력 후 '기록 저장' 버튼을 누른다.
+  - **Then** 
+    1. Supabase `game_scores` 테이블에 해당 점수 레코드가 정확히 1회 등록된다.
+    2. '기록 저장' 버튼은 즉시 비활성화(`disabled`) 처리되고 문구가 '저장 완료 ✓'로 변경된다.
+    3. 닉네임 인풋 역시 `disabled` 상태가 되어 동일 세션 내 중복 등록이 차단된다.
+    4. '다시 도전하기'를 눌러 다음 판이 끝나기 전까지 이전 점수가 중복 등록되지 않는다.
+
+- **시나리오 4: 상단 TOP 5 랭킹 모달 조회**
+  - **Given** 화면 상단에 '🏆 랭킹 보기' 버튼이 표시되어 있다.
+  - **When** 해당 버튼을 클릭한다.
+  - **Then** Supabase DB에서 조회된 상위 5개의 기록(순위, 닉네임, 점수)이 담긴 `LeaderboardModal`이 화면 중앙에 팝업된다.
 
 ## 11. 가정과 기본값 (AI가 대신 정한 것)
 
@@ -265,6 +279,8 @@ cup-shuffle-game/
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v22 | 2026. 10. 29. 17시 0분 16초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 및 애니메이션 궤적 보장, Supabase 랭킹 중복 저장 방지, 모바일/PC 반응형 레이아웃 일관성 검증 및 개발 착수 준비 완료 |
+| v21 | 2026. 10. 29. 16시 8분 19초 | 업데이트: 컵 카드 색상 일관화 및 PC·모바일에서 자연스러운 레이아웃 반영 |
 | v20 | 2026. 10. 29. 14시 14분 48초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 스타일, 섞기 애니메이션 궤적 보장, 점수 기록 저장 버튼 1회 비활성화 규칙, Supabase 연동 스펙 및 테스트 시나리오를 최종 확정했습니다. |
 | v19 | 2026. 10. 29. 14시 10분 39초 | 게임 종료 후 점수 기록 저장이 완료되면 '기록 저장' 버튼이 비활성화(disabled)되고 다음 게임 종료 시까지 재제출을 차단하도록 기능/화면/테스트 명세 반영 |
 | v18 | 2026. 10. 29. 13시 41분 21초 | 최종 감수: 최종 개발을 위해 컵 이동 애니메이션 기술 명세(슬롯 기반 좌표 전환)와 에러 대응 품질 기준을 보강하고 개발 착수 상태로 전환했습니다. |

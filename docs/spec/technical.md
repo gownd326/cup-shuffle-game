@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 기술·데이터 설계
 
-> 문서 버전 v20 · 완성도 100% · 마지막 수정 2026. 10. 29. 14시 32분 54초
+> 문서 버전 v22 · 완성도 100% · 마지막 수정 2026. 10. 29. 17시 4분 22초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -49,13 +49,13 @@
 ## 2. 기술 스택과 폴더 구조
 
 ### 1. 기술 스택
-- 프레임워크: Vite + React 18 (TypeScript)
-- 백엔드 / 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
-- 스타일링: Tailwind CSS (파스텔 테마 및 CSS Transform 애니메이션)
-- 사운드: Web Audio API (외부 파일 로딩 의존성 없는 브라우저 내장 신디사이저 사운드)
-- 아이콘: Lucide React (Trophy, RefreshCw, Star, Play 등)
+- 프레임워크: Vite (v5.x) + React 18 (TypeScript)
+- 스타일링: Tailwind CSS (파스텔 색상표 커스텀 및 transition 클래스)
+- 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
+- 오디오: Web Audio API (`AudioContext` 기반 브라우저 내장 오실레이터 비프음/클릭음 구현)
+- 아이콘: Lucide React (`Trophy`, `Play`, `RotateCcw`, `Check`, `Award`)
 
-### 2. 프로젝트 디렉토리 구조
+### 2. 프로젝트 디렉토리 및 파일 트리
 ```text
 cup-shuffle-game/
 ├── index.html
@@ -69,26 +69,27 @@ cup-shuffle-game/
     ├── App.tsx
     ├── index.css
     ├── lib/
-    │   └── supabase.ts         # createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+    │   └── supabase.ts         # createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
     ├── types/
-    │   └── game.ts             # GameState, CupItem, LevelConfig, ScoreRecord 타입
+    │   └── game.ts             # GameState, CupItemType, LevelConfig, ScoreRecord 타입 정의
     ├── constants/
-    │   └── levels.ts           # 레벨별 속도, 컵 개수, 섞기 횟수 테이블
+    │   └── levels.ts           # 레벨별 속도(duration), 컵 개수(cupCount), 교환 횟수(shuffleCount)
     ├── utils/
-    │   ├── sound.ts            # Web Audio API 톤 생성기 (정답, 오답, 컵 이동 사운드)
-    │   └── timer.ts            # sleep 비동기 딜레이 헬퍼
+    │   ├── sound.ts            # Web Audio API 톤 생성기 (정답 징글, 실패 톤, 컵 이동 스위시음)
+    │   └── timer.ts            # 비동기 딜레이 sleep 유틸리티
     └── components/
-        ├── Header.tsx           # 현재 점수, 최고 점수, 현재 레벨, 랭킹 보기 버튼
-        ├── StatusAlert.tsx      # 현재 게임 상태 말풍선 UI
+        ├── Header.tsx           # 점수판, 레벨, 랭킹 모달 열기 버튼
+        ├── StatusAlert.tsx      # 상황별 안내 말풍선
         ├── GameBoard.tsx        # 컵 슬롯 좌표 계산 및 translateX 애니메이션 제어
         ├── CupItem.tsx          # 100% 동일한 외관의 컵 카드 그래픽 컴포넌트
-        ├── GameOverModal.tsx    # 점수 확인, 닉네임 등록, 1회 저장 제한 버튼, 재도전 액션
+        ├── GameOverModal.tsx    # 점수 저장(1회 제한) 및 재도전 모달
         └── LeaderboardModal.tsx # 실시간 Supabase TOP 5 리더보드 모달
 ```
 
-### 3. 환경 변수
-- `VITE_SUPABASE_URL`: Supabase 프로젝트 URL (예: `https://xxxx.supabase.co`)
-- `VITE_SUPABASE_ANON_KEY`: Supabase 공개 익명 키 (Anon Key)
+### 3. 환경 변수 설정
+- Vite 클라이언트 환경 변수 (`.env`):
+  - `VITE_SUPABASE_URL`: Supabase 프로젝트 URL
+  - `VITE_SUPABASE_ANON_KEY`: Supabase 공개 익명 키 (Anon Key)
 
 ## 3. 품질 기준 (성능·보안·접근성)
 
@@ -108,6 +109,8 @@ cup-shuffle-game/
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v22 | 2026. 10. 29. 17시 0분 16초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 및 애니메이션 궤적 보장, Supabase 랭킹 중복 저장 방지, 모바일/PC 반응형 레이아웃 일관성 검증 및 개발 착수 준비 완료 |
+| v21 | 2026. 10. 29. 16시 8분 19초 | 업데이트: 컵 카드 색상 일관화 및 PC·모바일에서 자연스러운 레이아웃 반영 |
 | v20 | 2026. 10. 29. 14시 14분 48초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 스타일, 섞기 애니메이션 궤적 보장, 점수 기록 저장 버튼 1회 비활성화 규칙, Supabase 연동 스펙 및 테스트 시나리오를 최종 확정했습니다. |
 | v19 | 2026. 10. 29. 14시 10분 39초 | 게임 종료 후 점수 기록 저장이 완료되면 '기록 저장' 버튼이 비활성화(disabled)되고 다음 게임 종료 시까지 재제출을 차단하도록 기능/화면/테스트 명세 반영 |
 | v18 | 2026. 10. 29. 13시 41분 21초 | 최종 감수: 최종 개발을 위해 컵 이동 애니메이션 기술 명세(슬롯 기반 좌표 전환)와 에러 대응 품질 기준을 보강하고 개발 착수 상태로 전환했습니다. |

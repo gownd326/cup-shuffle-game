@@ -49,36 +49,26 @@ export default function GameOverModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="game-over-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
     >
       <div className="bg-white/95 border-2 border-pink-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center transform transition-all">
-        <div className="text-4xl sm:text-5xl mb-3">😢</div>
+        {/* 타이틀: 아쉽네요! 게임 종료 🥺 */}
         <h3
           id="game-over-title"
-          className="text-2xl sm:text-3xl font-extrabold text-slate-700 mb-2"
+          className="text-2xl sm:text-3xl font-extrabold text-slate-700 mb-3"
         >
-          게임 오버!
+          아쉽네요! 게임 종료 🥺
         </h3>
-        <p className="text-slate-500 text-sm sm:text-base mb-6">
-          아쉽네요! 점수를 등록하고 전 세계 랭킹을 확인해보세요!
+
+        {/* 점수 표시: 최종 점수: {score}점 | 클리어 레벨: Lv.{level} */}
+        <p className="bg-pink-50/70 border border-pink-100 rounded-2xl py-3 px-4 text-slate-700 font-bold text-sm sm:text-base mb-6">
+          최종 점수: <span className="text-pink-500 font-extrabold">{score}</span>점 | 클리어 레벨: <span className="text-sky-600 font-extrabold">Lv.{level}</span>
         </p>
 
-        {/* 상단: 최종 획득 점수 및 도달 레벨 */}
-        <div className="bg-pink-50/70 rounded-2xl p-4 mb-6 border border-pink-100 space-y-3">
-          <div className="flex justify-between items-center text-sm sm:text-base">
-            <span className="text-slate-500 font-medium">도달 레벨</span>
-            <span className="font-bold text-sky-600">Lv.{level}</span>
-          </div>
-          <div className="flex justify-between items-center text-base sm:text-lg">
-            <span className="text-slate-500 font-medium">최종 점수</span>
-            <span className="font-bold text-pink-500">{score}점</span>
-          </div>
-        </div>
-
-        {/* 닉네임 등록 폼 */}
+        {/* 닉네임 입력 및 저장 버튼 */}
         <form onSubmit={handleSubmit} className="mb-6 space-y-3 text-left">
           <label htmlFor="nickname-input" className="block text-xs font-semibold text-slate-600">
-            플레이어 닉네임 등록
+            플레이어 닉네임 (2~8자)
           </label>
           <div className="flex gap-2">
             <input
@@ -93,36 +83,30 @@ export default function GameOverModal({
                 isScoreSaved ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'
               }`}
             />
-            {isScoreSaved ? (
-              <button
-                type="button"
-                disabled={true}
-                className="bg-slate-300 text-slate-500 font-bold py-2.5 px-5 rounded-xl cursor-not-allowed text-sm whitespace-nowrap"
-              >
-                저장 완료 ✓
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="bg-pink-400 hover:bg-pink-500 text-white font-bold py-2.5 px-5 rounded-xl cursor-pointer text-sm whitespace-nowrap transition-all disabled:opacity-50"
-              >
-                {isSaving ? '저장 중...' : '기록 저장'}
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={isScoreSaved || isSaving}
+              className={`py-2.5 px-5 rounded-xl font-bold text-sm whitespace-nowrap transition-all ${
+                isScoreSaved
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-pink-400 hover:bg-pink-500 text-white cursor-pointer active:scale-95 disabled:opacity-50'
+              }`}
+            >
+              {isScoreSaved ? '저장 완료 ✓' : isSaving ? '저장 중...' : '기록 저장'}
+            </button>
           </div>
           {errorMessage && (
             <p className="text-xs text-red-500 font-semibold">{errorMessage}</p>
           )}
         </form>
 
-        {/* 하단 액션: 다시 도전하기 */}
+        {/* 재도전 버튼: 다시 도전하기 🔄 */}
         <button
           type="button"
           onClick={onRestart}
           className="w-full bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-3.5 px-8 rounded-full shadow-lg shadow-pink-300/50 text-base sm:text-lg transform active:scale-95 transition-all cursor-pointer"
         >
-          다시 도전하기
+          다시 도전하기 🔄
         </button>
       </div>
     </div>

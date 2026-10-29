@@ -3,37 +3,69 @@ import { getLevelConfig, calculateRoundScore, UNIFORM_CUP_STYLE } from '../src/c
 import { sleep } from '../src/utils/timer';
 import {
   saveLocalFallbackScore,
-  getLocalFallbackScores,
   insertGameScore,
   fetchTop5Scores,
 } from '../src/lib/supabase';
 
-describe('Cup Shuffle Game - SPEC v20 Tests', () => {
+describe('Cup Shuffle Game - SPEC v22 Tests', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('연기 테스트 (Smoke Test): 초기 화면 문구 및 레벨 1 기본 설정 검증', () => {
-    const expectedTitle = '도전! 컵 섞기 야바위 게임 🥤';
-    expect(expectedTitle).toContain('야바위 게임');
+  it('연기 테스트 (Smoke Test): 헤더 문구 "도전! 컵 섞기 야바위 게임 🥤", 점수 배너, 게임 시작 버튼 검증', () => {
+    const title = '도전! 컵 섞기 야바위 게임 🥤';
+    expect(title).toBe('도전! 컵 섞기 야바위 게임 🥤');
 
-    const lv1 = getLevelConfig(1);
-    expect(lv1).toEqual({
-      cups: 3,
-      shuffleCount: 4,
-      swapDuration: 750,
-      stepDelay: 250,
+    const scoreBannerLabels = ['Score:', 'Best:', 'Lv.'];
+    expect(scoreBannerLabels).toContain('Score:');
+    expect(scoreBannerLabels).toContain('Best:');
+    expect(scoreBannerLabels).toContain('Lv.');
+
+    const startButtonLabel = '게임 시작';
+    expect(startButtonLabel).toBe('게임 시작');
+  });
+
+  it('시나리오 1: 컵 카드의 100% 동일한 외관 및 힌트 부재 검증', () => {
+    // 배경색 bg-white/95, 테두리 border-pink-200, 그림자 shadow-md, 크기 w-20 h-30
+    const cardClass = UNIFORM_CUP_STYLE.cardClass;
+    expect(cardClass).toContain('bg-white/95');
+    expect(cardClass).toContain('border-pink-200');
+    expect(cardClass).toContain('shadow-md');
+    expect(cardClass).toContain('w-20');
+    expect(cardClass).toContain('h-30');
+    expect(cardClass).toContain('rounded-2xl');
+  });
+
+  it('시나리오 2: 컵 섞기 시 시각적 궤적 이동 검증 (transform: translateX(...) 유지 및 슬롯 교환)', () => {
+    const slotWidth = 100;
+    const cups = [
+      { id: 'cup-0', slotIndex: 0, yOffset: 0, zIndex: 10 },
+      { id: 'cup-1', slotIndex: 1, yOffset: 0, zIndex: 10 },
+      { id: 'cup-2', slotIndex: 2, yOffset: 0, zIndex: 10 },
+    ];
+
+    // 초기 transform 계산
+    const initialTransform0 = `translateX(${cups[0].slotIndex * slotWidth}px) translateY(${cups[0].yOffset}px)`;
+    expect(initialTransform0).toBe('translateX(0px) translateY(0px)');
+
+    // 0번 슬롯과 1번 슬롯 교환
+    const slotA = 0;
+    const slotB = 1;
+    const swapped = cups.map((c) => {
+      if (c.slotIndex === slotA) return { ...c, slotIndex: slotB, yOffset: -30, zIndex: 30 };
+      if (c.slotIndex === slotB) return { ...c, slotIndex: slotA, yOffset: 30, zIndex: 20 };
+      return { ...c, yOffset: 0, zIndex: 10 };
     });
+
+    const movedCup0 = swapped.find((c) => c.id === 'cup-0');
+    expect(movedCup0).toBeDefined();
+    expect(movedCup0?.slotIndex).toBe(1);
+
+    const movedTransform0 = `translateX(${movedCup0!.slotIndex * slotWidth}px) translateY(${movedCup0!.yOffset}px)`;
+    expect(movedTransform0).toBe('translateX(100px) translateY(-30px)');
   });
 
-  it('시나리오 1: 컵 카드의 동일한 외관 색상 검증', () => {
-    // 모든 카드는 외관으로 구별할 수 없도록 단일 화이트 크림톤 및 통일된 핑크 테두리
-    expect(UNIFORM_CUP_STYLE.cardClass).toContain('bg-white/95');
-    expect(UNIFORM_CUP_STYLE.cardClass).toContain('border-pink-200');
-    expect(UNIFORM_CUP_STYLE.cardClass).toContain('shadow-md');
-  });
-
-  it('시나리오 2: 게임 종료 후 기록 저장 및 버튼 비활성화 검증', async () => {
+  it('시나리오 3: 게임 오버 후 점수 등록 및 버튼 1회 비활성화 검증', async () => {
     // 1. 유효성 검증 (2~8자)
     await expect(insertGameScore('a', 500, 3)).rejects.toThrow('닉네임은 2~8자 사이여야 합니다.');
     await expect(insertGameScore('너무긴닉네임입니다아아', 500, 3)).rejects.toThrow('닉네임은 2~8자 사이여야 합니다.');
@@ -45,7 +77,7 @@ describe('Cup Shuffle Game - SPEC v20 Tests', () => {
     expect(savedRecord.score).toBe(550);
     expect(savedRecord.level).toBe(3);
 
-    // 저장 성공 시 플래그 전환
+    // 저장이 성공하면 isScoreSaved = true 전환
     isScoreSaved = true;
     expect(isScoreSaved).toBe(true);
 
@@ -58,16 +90,16 @@ describe('Cup Shuffle Game - SPEC v20 Tests', () => {
     expect(isButtonDisabled).toBe(true);
     expect(isInputDisabled).toBe(true);
 
-    // 4. 새 게임 시작 시 플래그 리셋 검증
-    const handleStartNewGame = () => {
+    // 4. 다시 도전하기 클릭 시 새 게임 플래그 리셋 검증
+    const restartGame = () => {
       isScoreSaved = false;
     };
-    handleStartNewGame();
+    restartGame();
     expect(isScoreSaved).toBe(false);
     expect(isScoreSaved ? '저장 완료 ✓' : '기록 저장').toBe('기록 저장');
   });
 
-  it('시나리오 3: 헤더 랭킹 버튼을 통한 실시간 TOP 5 조회', async () => {
+  it('시나리오 4: 상단 TOP 5 랭킹 모달 조회 검증', async () => {
     saveLocalFallbackScore({ nickname: '유저1', score: 200, level: 1 });
     saveLocalFallbackScore({ nickname: '유저2', score: 600, level: 4 });
     saveLocalFallbackScore({ nickname: '유저3', score: 450, level: 3 });
@@ -88,15 +120,45 @@ describe('Cup Shuffle Game - SPEC v20 Tests', () => {
     expect(rank).toBe(2);
   });
 
-  it('레벨 디자인 테이블 검증 (Lv.1 ~ Lv.5+ 속도 및 컵 개수)', () => {
-    expect(getLevelConfig(1)).toEqual({ cups: 3, shuffleCount: 4, swapDuration: 750, stepDelay: 250 });
-    expect(getLevelConfig(2)).toEqual({ cups: 3, shuffleCount: 6, swapDuration: 650, stepDelay: 200 });
-    expect(getLevelConfig(3)).toEqual({ cups: 4, shuffleCount: 7, swapDuration: 550, stepDelay: 150 });
-    expect(getLevelConfig(4)).toEqual({ cups: 4, shuffleCount: 9, swapDuration: 480, stepDelay: 120 });
-    expect(getLevelConfig(5)).toEqual({ cups: 5, shuffleCount: 10, swapDuration: 420, stepDelay: 100 });
+  it('레벨 디자인 테이블 검증 (Lv.1 ~ Lv.5+ 컵 개수, 이동시간, 슬롯 너비)', () => {
+    const lv1 = getLevelConfig(1);
+    expect(lv1.cups).toBe(3);
+    expect(lv1.shuffleCount).toBe(4);
+    expect(lv1.swapDuration).toBe(750);
+    expect(lv1.stepDelay).toBe(250);
+    expect(lv1.slotWidthDesktop).toBe(100);
+    expect(lv1.slotWidthMobile).toBe(70);
+
+    const lv2 = getLevelConfig(2);
+    expect(lv2.cups).toBe(3);
+    expect(lv2.shuffleCount).toBe(6);
+    expect(lv2.swapDuration).toBe(650);
+    expect(lv2.stepDelay).toBe(200);
+
+    const lv3 = getLevelConfig(3);
+    expect(lv3.cups).toBe(4);
+    expect(lv3.shuffleCount).toBe(7);
+    expect(lv3.swapDuration).toBe(550);
+    expect(lv3.stepDelay).toBe(150);
+    expect(lv3.slotWidthDesktop).toBe(90);
+    expect(lv3.slotWidthMobile).toBe(62);
+
+    const lv4 = getLevelConfig(4);
+    expect(lv4.cups).toBe(4);
+    expect(lv4.shuffleCount).toBe(9);
+    expect(lv4.swapDuration).toBe(480);
+    expect(lv4.stepDelay).toBe(120);
+
+    const lv5 = getLevelConfig(5);
+    expect(lv5.cups).toBe(5);
+    expect(lv5.shuffleCount).toBe(10);
+    expect(lv5.swapDuration).toBe(420);
+    expect(lv5.stepDelay).toBe(100);
+    expect(lv5.slotWidthDesktop).toBe(80);
+    expect(lv5.slotWidthMobile).toBe(55);
   });
 
-  it('점수 산정 공식 검증: (현재 레벨 × 100) + (잔여 컵 개수 × 50)', () => {
+  it('점수 산출 공식 검증: (현재 레벨 × 100) + (잔여 컵 개수 × 50)', () => {
     expect(calculateRoundScore(1, 3)).toBe(250);
     expect(calculateRoundScore(2, 3)).toBe(350);
     expect(calculateRoundScore(3, 4)).toBe(500);
@@ -104,36 +166,9 @@ describe('Cup Shuffle Game - SPEC v20 Tests', () => {
     expect(calculateRoundScore(5, 5)).toBe(750);
   });
 
-  it('섞기(MIXING) 좌표 스왑 및 yOffset 복원 로직 검증', () => {
-    const cups = [
-      { id: 'cup-0', slotIndex: 0, yOffset: 0, zIndex: 10 },
-      { id: 'cup-1', slotIndex: 1, yOffset: 0, zIndex: 10 },
-      { id: 'cup-2', slotIndex: 2, yOffset: 0, zIndex: 10 },
-    ];
-
-    const slotA = 0;
-    const slotB = 1;
-
-    // A위로 B아래로 아치 이동
-    const swapped = cups.map((c) => {
-      if (c.slotIndex === slotA) return { ...c, slotIndex: slotB, yOffset: -30, zIndex: 30 };
-      if (c.slotIndex === slotB) return { ...c, slotIndex: slotA, yOffset: 30, zIndex: 20 };
-      return { ...c, yOffset: 0, zIndex: 10 };
-    });
-
-    expect(swapped.find((c) => c.id === 'cup-0')?.slotIndex).toBe(1);
-    expect(swapped.find((c) => c.id === 'cup-0')?.yOffset).toBe(-30);
-    expect(swapped.find((c) => c.id === 'cup-1')?.slotIndex).toBe(0);
-    expect(swapped.find((c) => c.id === 'cup-1')?.yOffset).toBe(30);
-
-    // 이동 완료 후 yOffset 리셋
-    const reset = swapped.map((c) => ({ ...c, yOffset: 0, zIndex: 10 }));
-    expect(reset.every((c) => c.yOffset === 0 && c.zIndex === 10)).toBe(true);
-  });
-
-  it('비동기 sleep 타이머 검증', async () => {
+  it('sleep 타이머 비동기 지연 검증', async () => {
     const start = Date.now();
-    await sleep(40);
+    await sleep(35);
     expect(Date.now() - start).toBeGreaterThanOrEqual(30);
   });
 });

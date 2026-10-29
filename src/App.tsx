@@ -136,7 +136,7 @@ export default function App() {
 
       setGameState('MIXING');
 
-      // Async shuffle loop per SPEC Section 3.3
+      // Async shuffle loop per SPEC Section 3.2
       let lastPair: [number, number] = [-1, -1];
       for (let step = 0; step < config.shuffleCount; step++) {
         if (!isPlayingRef.current) return;
@@ -270,7 +270,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 text-slate-700 flex flex-col justify-between selection:bg-pink-300 selection:text-pink-900">
+    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 flex flex-col justify-between items-center p-4 selection:bg-pink-200 select-none overflow-x-hidden">
       <Header
         score={score}
         topScore={topScore}
@@ -278,10 +278,11 @@ export default function App() {
         onOpenLeaderboard={handleOpenLeaderboard}
       />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+      <main className="flex-1 w-full flex flex-col items-center justify-center my-auto">
         <StatusAlert gameState={gameState} />
 
         <GameBoard
+          level={level}
           gameState={gameState}
           cups={cups}
           ballCupId={ballCupId}

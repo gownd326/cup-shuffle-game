@@ -6,6 +6,9 @@ export default {
   ],
   theme: {
     extend: {
+      spacing: {
+        '30': '7.5rem', // 120px for h-30 per SPEC
+      },
       colors: {
         pink: {
           100: '#FCE7F3',

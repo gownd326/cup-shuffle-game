@@ -27,46 +27,49 @@ export default function CupItem({
   const x = cup.slotIndex * slotWidth;
   const y = cup.yOffset;
 
+  // translateY: PREVIEW -> -50px, REVEAL/CHOOSING selection open -> -40px per SPEC
+  const liftY = isOpen ? (gameState === 'PREVIEW' ? -50 : -40) : 0;
+
   return (
     <div
       data-testid={cup.id}
       style={{
         position: 'absolute',
         left: 0,
-        transform: `translate3d(${x}px, ${y}px, 0)`,
+        transform: `translateX(${x}px) translateY(${y}px)`,
         transition: isMixing
           ? `transform ${swapDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`
           : 'transform 300ms ease-out',
         zIndex: cup.zIndex,
       }}
-      className={`w-20 sm:w-24 h-40 flex flex-col items-center justify-end select-none ${
+      className={`w-20 sm:w-24 h-48 flex flex-col items-center justify-end select-none ${
         isMixing ? 'pointer-events-none' : 'pointer-events-auto'
       }`}
     >
-      {/* Floor Slot & Golden Ball */}
+      {/* Floor Slot & Red Ball (🔴 per SPEC) */}
       <div className="relative w-full h-10 flex items-center justify-center">
-        {/* Slot marker dot */}
+        {/* Floor Slot marker */}
         <div className="w-12 h-2.5 bg-pink-100 rounded-full shadow-inner" />
 
-        {/* Golden Ball sitting on the floor */}
+        {/* Ball: 붉은 구슬 (🔴), 정답 컵 아래 위치하며 컵이 들렸을 때만 시각적으로 노출 */}
         {hasBall && (
           <div
-            data-testid="golden-ball"
-            aria-label="황금 구슬"
+            data-testid="ball"
+            aria-label="숨겨진 공"
             className="absolute -top-1 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-xl sm:text-2xl filter drop-shadow animate-bounce-slow"
           >
-            🟡
+            🔴
           </div>
         )}
       </div>
 
-      {/* Cup Graphic (lifts up by 50px per SPEC when open/preview) */}
+      {/* Cup Card Graphic */}
       <div
         style={{
-          transform: isOpen ? 'translateY(-50px)' : 'translateY(0px)',
+          transform: `translateY(${liftY}px)`,
           transition: 'transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
-        className="absolute bottom-3 flex flex-col items-center"
+        className="absolute bottom-2 flex flex-col items-center"
       >
         <button
           type="button"
@@ -74,13 +77,11 @@ export default function CupItem({
           disabled={!isChoosing}
           onClick={() => onClick(cup.id)}
           aria-label={`${cup.slotIndex + 1}번 컵 선택`}
-          className={`w-20 h-28 rounded-2xl flex flex-col items-center justify-center text-4xl bg-white/95 border-2 border-pink-200 shadow-md relative transform transition-transform duration-200 ${
-            isChoosing
-              ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl active:scale-95'
-              : 'cursor-default'
-          }`}
+          className="focus:outline-none focus:ring-2 focus:ring-pink-300 rounded-2xl"
         >
-          <span className="select-none">🥤</span>
+          <div className="w-20 h-30 rounded-2xl bg-white/95 border-2 border-pink-200 shadow-md flex items-center justify-center text-4xl cursor-pointer hover:shadow-lg transition-shadow">
+            <span className="select-none">🥤</span>
+          </div>
         </button>
       </div>
     </div>
