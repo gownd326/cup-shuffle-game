@@ -12,7 +12,7 @@ export default function Header({ score, bestScore, level }: HeaderProps) {
     <header className="w-full py-6 px-4">
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-pink-500 drop-shadow-sm flex items-center gap-2 text-center">
-          <span>✨</span> 알록달록 컵 섞기 대작전 <span>✨</span>
+          도전! 컵 섞기 야바위 게임 🥤
         </h1>
         <div className="bg-white/80 backdrop-blur-md shadow-md rounded-2xl px-5 py-3 flex items-center gap-4 sm:gap-6 text-slate-700 font-semibold border border-pink-100 text-xs sm:text-sm">
           <div className="flex items-center gap-1.5">

@@ -71,25 +71,17 @@ export default function CupItem({
       >
         <button
           type="button"
+          data-testid="cup-card-button"
           disabled={!isChoosing}
           onClick={() => onClick(cup.id)}
           aria-label={`${cup.slotIndex + 1}번 컵 선택`}
-          className={`w-20 h-28 sm:w-22 sm:h-30 rounded-t-3xl shadow-lg border-2 ${
-            cup.color.border
-          } bg-gradient-to-b ${cup.color.gradient} ${
-            cup.color.shadow
-          } flex flex-col items-center justify-center relative transform transition-transform duration-200 ${
+          className={`w-20 h-28 rounded-2xl flex flex-col items-center justify-center text-4xl bg-white/95 border-2 border-pink-200 shadow-md relative transform transition-transform duration-200 ${
             isChoosing
               ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl active:scale-95'
               : 'cursor-default'
           }`}
         >
-          {/* Pastel Cup Rim and Pattern */}
-          <div className="w-14 h-2 bg-white/70 rounded-full mb-3" />
-          <span className="text-3xl sm:text-4xl drop-shadow-sm select-none">🥤</span>
-          <span className="text-[10px] sm:text-xs font-bold text-white/90 mt-1">
-            {cup.slotIndex + 1}
-          </span>
+          <span className="select-none">🥤</span>
         </button>
       </div>
     </div>

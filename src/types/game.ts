@@ -12,11 +12,6 @@ export interface CupItemData {
   slotIndex: number; // 0 ~ N-1
   yOffset: number; // -30, 30, or 0
   zIndex: number; // 10, 20, 30
-  color: {
-    gradient: string;
-    border: string;
-    shadow: string;
-  };
 }
 
 export interface LevelConfig {

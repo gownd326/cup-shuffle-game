@@ -1,32 +1,9 @@
 import { LevelConfig } from '../types/game';
 
-export const CUP_COLOR_PALETTES = [
-  {
-    gradient: 'from-pink-300 to-pink-400',
-    border: 'border-pink-200',
-    shadow: 'shadow-pink-200/50',
-  },
-  {
-    gradient: 'from-amber-200 to-yellow-300',
-    border: 'border-amber-200',
-    shadow: 'shadow-amber-200/50',
-  },
-  {
-    gradient: 'from-sky-300 to-cyan-400',
-    border: 'border-sky-200',
-    shadow: 'shadow-sky-200/50',
-  },
-  {
-    gradient: 'from-purple-300 to-purple-400',
-    border: 'border-purple-200',
-    shadow: 'shadow-purple-200/50',
-  },
-  {
-    gradient: 'from-emerald-300 to-teal-400',
-    border: 'border-emerald-200',
-    shadow: 'shadow-emerald-200/50',
-  },
-];
+// 야바위 게임의 공정성을 위해 모든 컵 카드는 완전히 동일한 단일 스타일을 적용합니다.
+export const UNIFORM_CUP_STYLE = {
+  cardClass: 'bg-white/95 border-2 border-pink-200 shadow-md',
+};
 
 export function getLevelConfig(level: number): LevelConfig {
   if (level === 1) {

@@ -14,15 +14,15 @@ export default function StatusAlert({ gameState }: StatusAlertProps) {
         return '샤샤샥- 섞이는 중! 컵의 움직임을 끝까지 쫓아가세요! 👀';
       case 'CHOOSING':
         return '공이 들어있는 컵을 터치해보세요! 👆';
-      case 'REVEAL':
-        return '두근두근! 공이 어디에 있을까요? 🔍';
       case 'ROUND_CLEAR':
         return '정답입니다! 다음 라운드로 출발! 🎉';
       case 'GAME_OVER':
         return '아쉽네요! 다시 도전해볼까요? 😢';
+      case 'REVEAL':
+        return '공이 들어있는 컵을 확인하는 중... 🔍';
       case 'IDLE':
       default:
-        return '아래 "게임 시작" 버튼을 눌러 출발하세요! 🎮';
+        return "'게임 시작' 버튼을 눌러 도전하세요! 🎯";
     }
   };
 

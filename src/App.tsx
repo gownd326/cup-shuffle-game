@@ -4,11 +4,7 @@ import StatusAlert from './components/StatusAlert';
 import GameBoard from './components/GameBoard';
 import GameOverModal from './components/GameOverModal';
 import { GameState, CupItemData } from './types/game';
-import {
-  getLevelConfig,
-  calculateRoundScore,
-  CUP_COLOR_PALETTES,
-} from './constants/levels';
+import { getLevelConfig, calculateRoundScore } from './constants/levels';
 import { playSound } from './utils/sound';
 import { sleep } from './utils/timer';
 
@@ -51,7 +47,6 @@ export default function App() {
       slotIndex: idx,
       yOffset: 0,
       zIndex: 10,
-      color: CUP_COLOR_PALETTES[idx % CUP_COLOR_PALETTES.length],
     }));
   }, []);
 
