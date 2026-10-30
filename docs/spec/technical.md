@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 기술·데이터 설계
 
-> 문서 버전 v22 · 완성도 100% · 마지막 수정 2026. 10. 29. 17시 4분 22초
+> 문서 버전 v24 · 완성도 100% · 마지막 수정 2026. 10. 30. 9시 16분 51초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -9,106 +9,113 @@
 | --- | --- |
 | 사이트 이름 | 컵 섞기 야바위 게임 |
 | 영문 식별자(slug) | cup-shuffle-game |
-| 개발 방식(framework) | vite |
-| 데이터베이스 사용 | 예 (Supabase) |
+| 개발 방식(framework) | nextjs |
+| 데이터베이스 사용 | 예 (Neon PostgreSQL) |
 | 배포 | GitHub → Vercel (무료) |
 
 ## 1. 데이터 모델
 
-### 1. 데이터베이스 스키마 (Supabase PostgreSQL)
+### 1. 데이터베이스 스키마 (Neon PostgreSQL)
 - **테이블명**: `game_scores`
 - **컬럼 정의**:
 
 | 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `id` | `uuid` | Primary Key, `default: gen_random_uuid()` | 고유 식별자 |
-| `nickname` | `text` | NOT NULL, `length(nickname) between 2 and 8` | 플레이어 닉네임 |
-| `score` | `integer` | NOT NULL, `check: score >= 0` | 최종 획득 점수 |
-| `level` | `integer` | NOT NULL, `default: 1` | 도달한 최종 레벨 |
-| `created_at` | `timestamptz` | NOT NULL, `default: now()` | 점수 기록 일시 |
+| `id` | `UUID` | PRIMARY KEY DEFAULT gen_random_uuid() | 고유 식별자 |
+| `nickname` | `VARCHAR(8)` | NOT NULL, CHECK (char_length(nickname) >= 2) | 플레이어 닉네임 (2~8자) |
+| `score` | `INTEGER` | NOT NULL, CHECK (score >= 0) | 최종 획득 점수 |
+| `level` | `INTEGER` | NOT NULL DEFAULT 1 | 도달한 최종 레벨 |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() | 점수 기록 일시 |
 
-### 2. 행 수준 보안 (RLS: Row Level Security) 정책
-- RLS 활성화: `ALTER TABLE game_scores ENABLE ROW LEVEL SECURITY;`
-- **읽기 정책 (모든 유저 공개 조회)**:
-  ```sql
-  CREATE POLICY "Allow public read on game_scores"
-  ON game_scores FOR SELECT
-  USING (true);
-  ```
-- **쓰기 정책 (누구나 점수 등록 가능)**:
-  ```sql
-  CREATE POLICY "Allow public insert on game_scores"
-  ON game_scores FOR INSERT
-  WITH CHECK (true);
-  ```
+- **테이블 생성 DDL**:
+```sql
+CREATE TABLE IF NOT EXISTS game_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nickname VARCHAR(8) NOT NULL CHECK (char_length(nickname) >= 2),
+  score INTEGER NOT NULL CHECK (score >= 0),
+  level INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_game_scores_ranking ON game_scores (score DESC, created_at ASC);
+```
 
-### 3. 순위 조회 쿼리
-- TOP 5 조회: `SELECT * FROM game_scores ORDER BY score DESC, created_at ASC LIMIT 5;`
-- 전체 최고 점수 조회: `SELECT score FROM game_scores ORDER BY score DESC LIMIT 1;`
+### 2. 서버 API 엔드포인트
+- `GET /api/scores/top5`:
+  - 상위 5개 레코드 반환 (`SELECT nickname, score, level, created_at FROM game_scores ORDER BY score DESC, created_at ASC LIMIT 5;`)
+- `POST /api/scores`:
+  - 바디: `{ nickname: string, score: number, level: number }`
+  - 서버 유효성 검사: 닉네임 길이(2~8자), score 0 이상 정수 확인 후 DB INSERT.
+  - 응답: `{ success: true, record: { id, nickname, score, level } }`
 
 ## 2. 기술 스택과 폴더 구조
 
 ### 1. 기술 스택
-- 프레임워크: Vite (v5.x) + React 18 (TypeScript)
-- 스타일링: Tailwind CSS (파스텔 색상표 커스텀 및 transition 클래스)
-- 데이터베이스: Supabase (PostgreSQL, `@supabase/supabase-js` v2)
+- 프레임워크: Next.js (App Router, React 18, TypeScript)
+- 스타일링: Tailwind CSS
+- 데이터베이스: Neon PostgreSQL (`@neondatabase/serverless` 드라이버 사용)
 - 오디오: Web Audio API (`AudioContext` 기반 브라우저 내장 오실레이터 비프음/클릭음 구현)
 - 아이콘: Lucide React (`Trophy`, `Play`, `RotateCcw`, `Check`, `Award`)
 
 ### 2. 프로젝트 디렉토리 및 파일 트리
 ```text
 cup-shuffle-game/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── tailwind.config.js
+├── app/
+│   ├── layout.tsx              # 전역 폰트 및 메타데이터
+│   ├── page.tsx                # 메인 게임 단일 페이지
+│   └── api/
+│       └── scores/
+│           ├── route.ts        # POST: 점수 저장 처리
+│           └── top5/
+│               └── route.ts    # GET: 상위 5명 점수 조회
+├── components/
+│   ├── Header.tsx              # 점수판, 최고점수, 레벨 및 랭킹 모달 버튼
+│   ├── StatusAlert.tsx         # 상황별 안내 말풍선
+│   ├── GameBoard.tsx           # 컵 슬롯 좌표 계산 및 translateX 애니메이션 제어
+│   ├── CupItem.tsx             # 모든 컵에 동일한 외관을 적용하는 카드 컴포넌트
+│   ├── Ball.tsx                # 붉은색 공 컴포넌트 (표시/은폐 제어)
+│   ├── GameOverModal.tsx       # 점수 저장(1회 제한) 및 재도전 모달
+│   └── LeaderboardModal.tsx    # 실시간 TOP 5 리더보드 모달
+├── lib/
+│   └── db.ts                   # Neon serverless pool/sql 클라이언트 인스턴스
+├── types/
+│   └── game.ts                 # GameState, CupItemType, LevelConfig, ScoreRecord 타입 정의
+├── constants/
+│   └── levels.ts               # 레벨별 속도(duration), 컵 개수(cupCount), 교환 횟수(shuffleCount)
+├── utils/
+│   ├── sound.ts                # Web Audio API 톤 생성기 (정답 징글, 실패 톤, 이동음)
+│   └── timer.ts                # 비동기 딜레이 sleep 유틸리티
 ├── .env.example
-└── src/
-    ├── main.tsx
-    ├── App.tsx
-    ├── index.css
-    ├── lib/
-    │   └── supabase.ts         # createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
-    ├── types/
-    │   └── game.ts             # GameState, CupItemType, LevelConfig, ScoreRecord 타입 정의
-    ├── constants/
-    │   └── levels.ts           # 레벨별 속도(duration), 컵 개수(cupCount), 교환 횟수(shuffleCount)
-    ├── utils/
-    │   ├── sound.ts            # Web Audio API 톤 생성기 (정답 징글, 실패 톤, 컵 이동 스위시음)
-    │   └── timer.ts            # 비동기 딜레이 sleep 유틸리티
-    └── components/
-        ├── Header.tsx           # 점수판, 레벨, 랭킹 모달 열기 버튼
-        ├── StatusAlert.tsx      # 상황별 안내 말풍선
-        ├── GameBoard.tsx        # 컵 슬롯 좌표 계산 및 translateX 애니메이션 제어
-        ├── CupItem.tsx          # 100% 동일한 외관의 컵 카드 그래픽 컴포넌트
-        ├── GameOverModal.tsx    # 점수 저장(1회 제한) 및 재도전 모달
-        └── LeaderboardModal.tsx # 실시간 Supabase TOP 5 리더보드 모달
+├── next.config.mjs
+├── tailwind.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
 ### 3. 환경 변수 설정
-- Vite 클라이언트 환경 변수 (`.env`):
-  - `VITE_SUPABASE_URL`: Supabase 프로젝트 URL
-  - `VITE_SUPABASE_ANON_KEY`: Supabase 공개 익명 키 (Anon Key)
+- 서버 전용 환경 변수 (`.env.local`):
+  - `DATABASE_URL`: Neon PostgreSQL 연결 문자열 (클라이언트에 노출되지 않음)
 
 ## 3. 품질 기준 (성능·보안·접근성)
 
-### 1. 성능 및 애니메이션 안정성
-- **눈으로 추적 가능한 컵 이동 궤적 보장**: DOM 요소를 React 렌더링으로 재마운트하지 않고, 각 컵 카드 요소에 고유 key(`cup.id`)를 부여한 상태에서 슬롯 인덱스에 따른 `transform: translateX(...)` 속성만을 변경. 브라우저의 리플로우(Reflow)를 유발하지 않고 GPU 가속 기반 60fps 부드러운 이동 궤적을 보장함.
-- **중복 입력 및 조작 방지**: `MIXING` 및 `PREVIEW` 상태에서는 게임판 전체에 `pointer-events: none`을 강제 적용하여 섞는 도중 컵 터치를 원천 차단함.
+### 1. 공 은폐 및 투과 방지 품질 기준
+- **시각적 비침 차단**: 컵 카드의 배경색을 알파 채널이 없는 완전한 불투명 백색(`bg-white`, `#FFFFFF`)으로 설정하고, `MIXING` 및 `CHOOSING` 상태에서는 공 요소를 DOM에서 가상으로 숨기거나 `opacity: 0; visibility: hidden;` 처리하여 어떠한 환경(고대비 모니터, OLED 디스플레이)에서도 공의 위치가 투과되어 보이지 않도록 함.
+- **렌더링 순서 (z-index) 보장**: 컵 카드(`z-index: 20`) > 공(`z-index: 10`) > 배경 레일(`z-index: 0`).
 
-### 2. 네트워크 및 Supabase 장애 대비 (폴백 메커니즘)
-- Supabase 연결 실패 또는 네트워크 오류 발생 시 게임 플레이가 중단되지 않도록 로컬스토리지(`localStorage.getItem('cup_best_score')`)에 최고 점수를 자동 백업 저장.
-- 랭킹 데이터 로딩 실패 시 에러 안내 문구("랭킹을 불러오지 못했습니다. 네트워크를 확인해주세요.")와 '다시 시도' 버튼을 표시.
+### 2. 크로스 디바이스 반응형 및 겹침 방지 품질 기준
+- **최소 지원 해상도**: 모바일 가로 320px(iPhone SE 등 구형 기기)부터 PC 와이드 모니터까지 지원.
+- **오버플로우 및 잘림 방지**: 보드 컨테이너에 `overflow-x-hidden` 및 동적 슬롯 계산(`slotWidth * cupCount <= containerWidth`)을 강제하여 가로 스크롤 발생이나 컵 요소의 잘림을 방지함.
+- **이동 궤적 보장**: 60fps 부드러운 이동을 위해 CSS `transform: translateX(...)` 및 `transition: transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)` 유지.
 
-### 3. 모바일/터치 접근성
-- 컵 카드의 최소 터치 영역을 80px × 110px 이상 확보하여 스마트폰 터치 시 조작 실수를 방지.
-- 가로 스크롤 방지(`overflow-x-hidden`) 및 모바일 세로 뷰에 맞춰 컵 간격 자동 축소(CSS Flex / Grid gap 조절).
+### 3. 상태 안전성
+- 섞는 도중(`MIXING`) 터치 및 클릭 차단 (`pointer-events: none`).
+- 점수 등록은 게임당 1회로 한정되며, 저장 직후 버튼 및 인풋이 즉시 비활성화됨.
 
 ## 변경 이력
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v24 | 2026. 10. 30. 9시 11분 33초 | 최종 감수: Next.js App Router와 Neon PostgreSQL 기반으로 아키텍처를 정렬하고, 모든 컵 카드의 색상 동일화(단일 화이트) 및 공 비침 차단 규칙을 완벽히 동기화하여 개발 준비를 마쳤습니다. |
+| v23 | 2026. 10. 30. 8시 51분 41초 | 모바일 화면 컵 카드 겹침/잘림 방지를 위한 동적 반응형 슬롯 계산 적용 및 카드 100% 완전 불투명화와 공 노출 시점 제어 명시 |
 | v22 | 2026. 10. 29. 17시 0분 16초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 및 애니메이션 궤적 보장, Supabase 랭킹 중복 저장 방지, 모바일/PC 반응형 레이아웃 일관성 검증 및 개발 착수 준비 완료 |
 | v21 | 2026. 10. 29. 16시 8분 19초 | 업데이트: 컵 카드 색상 일관화 및 PC·모바일에서 자연스러운 레이아웃 반영 |
 | v20 | 2026. 10. 29. 14시 14분 48초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 스타일, 섞기 애니메이션 궤적 보장, 점수 기록 저장 버튼 1회 비활성화 규칙, Supabase 연동 스펙 및 테스트 시나리오를 최종 확정했습니다. |

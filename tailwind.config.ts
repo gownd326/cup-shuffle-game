@@ -1,14 +1,12 @@
-/** @type {import('tailwindcss').Config} */
-export default {
+import type { Config } from 'tailwindcss';
+
+const config: Config = {
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
-      spacing: {
-        '30': '7.5rem', // 120px for h-30 per SPEC
-      },
       colors: {
         pink: {
           100: '#FCE7F3',
@@ -28,12 +26,26 @@ export default {
         slate: {
           500: '#64748B',
           700: '#334155',
-        }
+        },
       },
       fontFamily: {
-        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', '"Open Sans"', '"Helvetica Neue"', 'sans-serif'],
+        sans: [
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          'Oxygen',
+          'Ubuntu',
+          'Cantarell',
+          '"Open Sans"',
+          '"Helvetica Neue"',
+          'sans-serif',
+        ],
       },
     },
   },
   plugins: [],
-}
+};
+
+export default config;

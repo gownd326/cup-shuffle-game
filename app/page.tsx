@@ -1,22 +1,19 @@
+'use client';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Header from './components/Header';
-import StatusAlert from './components/StatusAlert';
-import GameBoard from './components/GameBoard';
-import GameOverModal from './components/GameOverModal';
-import LeaderboardModal from './components/LeaderboardModal';
-import { GameState, CupItemData, ScoreRecord } from './types/game';
-import { getLevelConfig, calculateRoundScore } from './constants/levels';
-import { playSound } from './utils/sound';
-import { sleep } from './utils/timer';
-import {
-  fetchTop5Scores,
-  fetchTopScore,
-  insertGameScore,
-} from './lib/supabase';
+import Header from '@/components/Header';
+import StatusAlert from '@/components/StatusAlert';
+import GameBoard from '@/components/GameBoard';
+import GameOverModal from '@/components/GameOverModal';
+import LeaderboardModal from '@/components/LeaderboardModal';
+import { GameState, CupItemData, ScoreRecord } from '@/types/game';
+import { getLevelConfig, calculateRoundScore } from '@/constants/levels';
+import { playSound } from '@/utils/sound';
+import { sleep } from '@/utils/timer';
 
 const BEST_SCORE_STORAGE_KEY = 'cup_best_score';
 
-export default function App() {
+export default function HomePage() {
   const [gameState, setGameState] = useState<GameState>('IDLE');
   const [score, setScore] = useState<number>(0);
   const [topScore, setTopScore] = useState<number>(0);
@@ -44,12 +41,19 @@ export default function App() {
   useEffect(() => {
     const loadInitialTop = async () => {
       try {
-        const top = await fetchTopScore();
-        setTopScore(top);
+        const res = await fetch('/api/scores/top5');
+        if (res.ok) {
+          const data: ScoreRecord[] = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setTopScore(data[0].score);
+            return;
+          }
+        }
       } catch {
-        const fallback = Number(localStorage.getItem(BEST_SCORE_STORAGE_KEY) || '0');
-        setTopScore(fallback);
+        // ignore
       }
+      const fallback = Number(localStorage.getItem(BEST_SCORE_STORAGE_KEY) || '0');
+      setTopScore(fallback);
     };
     loadInitialTop();
   }, []);
@@ -59,7 +63,11 @@ export default function App() {
     setIsLoadingLeaderboard(true);
     setLeaderboardError(null);
     try {
-      const top5 = await fetchTop5Scores();
+      const res = await fetch('/api/scores/top5');
+      if (!res.ok) {
+        throw new Error('랭킹을 불러오지 못했습니다.');
+      }
+      const top5: ScoreRecord[] = await res.json();
       setLeaderboardScores(top5);
       if (top5.length > 0 && top5[0].score > topScore) {
         setTopScore(top5[0].score);
@@ -71,13 +79,11 @@ export default function App() {
     }
   }, [topScore]);
 
-  // Open leaderboard manually
   const handleOpenLeaderboard = () => {
     setIsLeaderboardOpen(true);
     loadLeaderboardData();
   };
 
-  // Close leaderboard
   const handleCloseLeaderboard = () => {
     setIsLeaderboardOpen(false);
   };
@@ -108,7 +114,7 @@ export default function App() {
     return [a, b];
   };
 
-  // Run the full round sequence: PREVIEW -> MIXING -> CHOOSING
+  // Run the full round sequence: PREVIEW (1.5s ball visible) -> MIXING (ball hidden) -> CHOOSING (ball hidden)
   const runRound = useCallback(
     async (roundLevel: number) => {
       const config = getLevelConfig(roundLevel);
@@ -121,22 +127,21 @@ export default function App() {
 
       setCups(newCups);
       setBallCupId(chosenBallCupId);
+      // PREVIEW: 정답 컵 위로 들리고 공 1.5초간 노출
       setRevealedCupIds([chosenBallCupId]);
       setGameState('PREVIEW');
       playSound('start');
 
-      // PREVIEW stage: reveal ball for 1.5s
       await sleep(1500);
       if (!isPlayingRef.current) return;
 
-      // Close cup and enter MIXING
+      // Close cup and enter MIXING (공 완전히 은폐)
       setRevealedCupIds([]);
       await sleep(300);
       if (!isPlayingRef.current) return;
 
       setGameState('MIXING');
 
-      // Async shuffle loop per SPEC Section 3.2
       let lastPair: [number, number] = [-1, -1];
       for (let step = 0; step < config.shuffleCount; step++) {
         if (!isPlayingRef.current) return;
@@ -144,7 +149,7 @@ export default function App() {
         const [slotA, slotB] = pickTwoRandomSlots(config.cups, lastPair);
         lastPair = [slotA, slotB];
 
-        // 1. Swap slotIndex and apply arch yOffset: A goes up (-30px, z: 30), B goes down (30px, z: 20)
+        // 1. Swap slotIndex and apply arch yOffset
         setCups((prev) =>
           prev.map((c) => {
             if (c.slotIndex === slotA) {
@@ -158,7 +163,6 @@ export default function App() {
         );
         playSound('shuffle');
 
-        // Wait for movement to finish
         await sleep(config.swapDuration);
         if (!isPlayingRef.current) return;
 
@@ -171,12 +175,11 @@ export default function App() {
           }))
         );
 
-        // Wait for step delay cooldown
         await sleep(config.stepDelay);
         if (!isPlayingRef.current) return;
       }
 
-      // Mixing finished -> CHOOSING
+      // Mixing finished -> CHOOSING (공 여전히 은폐)
       setGameState('CHOOSING');
     },
     [createCupList]
@@ -220,7 +223,7 @@ export default function App() {
       await sleep(350);
       setGameState('ROUND_CLEAR');
 
-      // 1.2s celebration then proceed to next level per SPEC
+      // 1.2s celebration then next level per SPEC
       await sleep(1200);
       if (!isPlayingRef.current) return;
 
@@ -228,7 +231,7 @@ export default function App() {
       setLevel(nextLevel);
       runRound(nextLevel);
     } else {
-      // Incorrect! Open clicked cup and also reveal the winning cup
+      // Incorrect! Reveal clicked cup & correct cup -> GAME_OVER
       setRevealedCupIds([clickedCupId, ballCupId]);
       playSound('incorrect');
 
@@ -247,22 +250,29 @@ export default function App() {
     }
   };
 
-  // Submit score to Supabase and show TOP 5
+  // Submit score via POST /api/scores
   const handleSaveScore = async (nickname: string) => {
     setIsSavingScore(true);
     try {
-      const savedRecord = await insertGameScore(nickname, score, level);
-      setHighlightedRecordId(savedRecord.id);
+      const res = await fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname, score, level }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || '점수 저장에 실패했습니다.');
+      }
+
+      const result = await res.json();
+      if (result.record?.id) {
+        setHighlightedRecordId(result.record.id);
+      }
       setIsScoreSaved(true); // Disable button & input immediately per SPEC
 
       // Refresh leaderboard & update top score
-      const top5 = await fetchTop5Scores();
-      setLeaderboardScores(top5);
-      if (top5.length > 0 && top5[0].score > topScore) {
-        setTopScore(top5[0].score);
-      }
-
-      // Show leaderboard modal
+      await loadLeaderboardData();
       setIsLeaderboardOpen(true);
     } finally {
       setIsSavingScore(false);
@@ -270,7 +280,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 flex flex-col justify-between items-center p-4 selection:bg-pink-200 select-none overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 flex flex-col justify-between items-center p-3 sm:p-4 select-none overflow-x-hidden">
       <Header
         score={score}
         topScore={topScore}
@@ -278,7 +288,7 @@ export default function App() {
         onOpenLeaderboard={handleOpenLeaderboard}
       />
 
-      <main className="flex-1 w-full flex flex-col items-center justify-center my-auto">
+      <main className="flex-1 w-full flex flex-col items-center justify-center my-auto px-2">
         <StatusAlert gameState={gameState} />
 
         <GameBoard
@@ -293,7 +303,7 @@ export default function App() {
         />
       </main>
 
-      {/* 게임 오버 모달 (점수 등록 및 다시 도전) */}
+      {/* 게임 오버 모달 (점수 1회 저장 및 재도전) */}
       <GameOverModal
         isOpen={gameState === 'GAME_OVER'}
         score={score}

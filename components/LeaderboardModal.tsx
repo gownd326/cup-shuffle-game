@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScoreRecord } from '../types/game';
+import { ScoreRecord } from '@/types/game';
 import { RefreshCw, X } from 'lucide-react';
 
 interface LeaderboardModalProps {
@@ -55,8 +55,8 @@ export default function LeaderboardModal({
       aria-labelledby="leaderboard-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
     >
-      <div className="bg-white/95 border-2 border-pink-200 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl transform transition-all relative">
-        {/* Close button */}
+      <div className="bg-white/95 backdrop-blur-md border border-pink-100 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl transform transition-all relative">
+        {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
@@ -66,7 +66,7 @@ export default function LeaderboardModal({
           <X className="w-5 h-5" />
         </button>
 
-        {/* 헤더: 🏆 실시간 명예의 전당 TOP 5 */}
+        {/* 헤더 */}
         <div className="text-center mb-6">
           <h2
             id="leaderboard-title"
@@ -87,9 +87,7 @@ export default function LeaderboardModal({
           </div>
         ) : error ? (
           <div className="py-8 text-center space-y-4">
-            <p className="text-pink-600 font-medium text-sm">
-              {error}
-            </p>
+            <p className="text-pink-600 font-medium text-sm">{error}</p>
             <button
               type="button"
               onClick={onRetry}

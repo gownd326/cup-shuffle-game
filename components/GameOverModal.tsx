@@ -51,8 +51,8 @@ export default function GameOverModal({
       aria-labelledby="game-over-title"
       className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
     >
-      <div className="bg-white/95 border-2 border-pink-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center transform transition-all">
-        {/* 타이틀: 아쉽네요! 게임 종료 🥺 */}
+      <div className="bg-white/95 backdrop-blur-md border border-pink-100 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center transform transition-all">
+        {/* 타이틀 */}
         <h3
           id="game-over-title"
           className="text-2xl sm:text-3xl font-extrabold text-slate-700 mb-3"
@@ -60,12 +60,12 @@ export default function GameOverModal({
           아쉽네요! 게임 종료 🥺
         </h3>
 
-        {/* 점수 표시: 최종 점수: {score}점 | 클리어 레벨: Lv.{level} */}
+        {/* 점수 표시 */}
         <p className="bg-pink-50/70 border border-pink-100 rounded-2xl py-3 px-4 text-slate-700 font-bold text-sm sm:text-base mb-6">
           최종 점수: <span className="text-pink-500 font-extrabold">{score}</span>점 | 클리어 레벨: <span className="text-sky-600 font-extrabold">Lv.{level}</span>
         </p>
 
-        {/* 닉네임 입력 및 저장 버튼 */}
+        {/* 닉네임 입력 및 저장 버튼 (SPEC: 저장이 완료되면 1회 제한 비활성화) */}
         <form onSubmit={handleSubmit} className="mb-6 space-y-3 text-left">
           <label htmlFor="nickname-input" className="block text-xs font-semibold text-slate-600">
             플레이어 닉네임 (2~8자)
@@ -100,11 +100,11 @@ export default function GameOverModal({
           )}
         </form>
 
-        {/* 재도전 버튼: 다시 도전하기 🔄 */}
+        {/* 재도전 버튼 */}
         <button
           type="button"
           onClick={onRestart}
-          className="w-full bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold py-3.5 px-8 rounded-full shadow-lg shadow-pink-300/50 text-base sm:text-lg transform active:scale-95 transition-all cursor-pointer"
+          className="w-full bg-pink-400 hover:bg-pink-500 text-white font-bold py-3.5 px-8 rounded-full shadow-lg shadow-pink-200/50 text-base sm:text-lg transform active:scale-95 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-pink-300"
         >
           다시 도전하기 🔄
         </button>

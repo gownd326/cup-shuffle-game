@@ -19,6 +19,10 @@ export interface LevelConfig {
   shuffleCount: number;
   swapDuration: number;
   stepDelay: number;
+  pcSlotWidth: number;
+  pcCupWidth: number;
+  mobileSlotWidth: number;
+  mobileCupWidth: number;
 }
 
 export interface ScoreRecord {
