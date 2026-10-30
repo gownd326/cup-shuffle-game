@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 기술·데이터 설계
 
-> 문서 버전 v27 · 완성도 100% · 마지막 수정 2026. 10. 30. 14시 38분 59초
+> 문서 버전 v29 · 완성도 100% · 마지막 수정 2026. 10. 30. 15시 27분 29초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -15,17 +15,21 @@
 
 ## 1. 데이터 모델
 
-### Neon PostgreSQL 테이블
-모든 점수 기록은 Neon PostgreSQL의 `game_scores` 테이블에 저장한다. 테이블 변경은 서버에서 실행할 SQL 스키마로 관리한다.
+### Neon PostgreSQL 단독 사용 및 자동 테이블 생성 (Auto-migration)
+- 데이터베이스는 Neon PostgreSQL만을 단독으로 사용한다(Supabase 미사용).
+- 별도의 수동 DB 설정 과정 없이, 서버 초기화 시 또는 API 라우트(`/api/scores`, `/api/scores/top5`) 최초 접근 시 `ensureTableExists()` 함수를 실행하여 테이블과 인덱스가 없으면 자동 생성한다.
+
+### 테이블 스키마
 
 | 필드 | PostgreSQL 타입 | 제약 | 설명 |
 | --- | --- | --- | --- |
-| `id` | `UUID` | 기본 키, 기본값 `gen_random_uuid()` | 기록 ID |
-| `nickname` | `VARCHAR(8)` | 필수, 길이 2~8자 | 저장 시 앞뒤 공백을 제거한 닉네임 |
-| `score` | `INTEGER` | 필수, 0 이상 | 게임 최종 점수 |
-| `level` | `INTEGER` | 필수, 1 이상 | 게임 종료 시 도달한 레벨 |
-| `created_at` | `TIMESTAMPTZ` | 필수, 기본값 `NOW()` | 저장 시각 |
+| `id` | `UUID` | 기본 키, 기본값 `gen_random_uuid()` | 점수 기록 ID |
+| `nickname` | `VARCHAR(8)` | 필수, 길이 2~8자 | 공백 제거된 사용자 닉네임 |
+| `score` | `INTEGER` | 필수, 0 이상 | 최종 게임 점수 |
+| `level` | `INTEGER` | 필수, 1 이상 | 달성 레벨 |
+| `created_at` | `TIMESTAMPTZ` | 필수, 기본값 `NOW()` | 기록 등록 시각 |
 
+### 자동 실행 DDL 쿼리
 ```sql
 CREATE TABLE IF NOT EXISTS game_scores (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -39,30 +43,29 @@ CREATE INDEX IF NOT EXISTS idx_game_scores_ranking
   ON game_scores (score DESC, created_at ASC);
 ```
 
-- 서버는 `@neondatabase/serverless`로 DB에 접근한다. DB 쿼리는 API 라우트에서만 실행한다.
-- 개인 최고 점수는 서버 DB가 아니라 브라우저 `localStorage`의 `cup-shuffle-best-score` 키에 저장한다. 이 값은 랭킹 기록과 별개다.
-- Supabase 데이터를 자동으로 이전하는 기능은 이번 구현 범위에 포함하지 않는다. 기존 DB 자격 증명과 데이터 내보내기 파일이 제공되지 않았으므로, 기존 데이터 이전은 별도 운영 작업이다.
+- 서버는 `@neondatabase/serverless` 라이브러리를 사용해 연결하며 연결 문자열은 서버 환경 변수 `DATABASE_URL`로만 주입한다.
+- 개인 최고 점수는 서버 DB가 아닌 브라우저의 `localStorage` (`cup-shuffle-best-score`)에 독립 저장한다.
 
-### API 계약
-#### `POST /api/scores`
-- 요청 JSON: `{ "nickname": "민수", "score": 450, "level": 1 }`
-- 서버는 JSON 형식, 닉네임의 앞뒤 공백 제거 후 길이 2~8자, `score`의 0 이상 정수, `level`의 1 이상 정수를 검사한다.
-- 성공 시 HTTP 201과 `{ "success": true, "record": { "id": "UUID", "nickname": "민수", "score": 450, "level": 1, "createdAt": "ISO-8601 문자열" } }`를 반환한다.
-- 유효하지 않은 입력은 HTTP 400과 `{ "success": false, "error": "INVALID_INPUT" }`를 반환한다. DB 오류는 상세 정보를 노출하지 않고 HTTP 503과 `{ "success": false, "error": "SAVE_FAILED" }`를 반환한다.
-- 닉네임과 점수는 준비된 쿼리 매개변수로 전달한다. 클라이언트 검증만 신뢰하지 않는다.
+### API 명세
+#### 1. `POST /api/scores`
+- 요청 본문: `{ "nickname": "민수", "score": 450, "level": 1 }`
+- 동작: `ensureTableExists()` 호출 후 파라미터 바인딩 쿼리로 레코드 삽입
+- 성공 응답: HTTP 201 `{ "success": true, "record": { "id": "UUID", "nickname": "민수", "score": 450, "level": 1, "createdAt": "ISO-8601" } }`
+- 검증 실패(공백 제외 2~8자 미충족 등): HTTP 400 `{ "success": false, "error": "INVALID_INPUT" }`
+- DB 장애: HTTP 503 `{ "success": false, "error": "SAVE_FAILED" }`
 
-#### `GET /api/scores/top5`
-- 성공 시 HTTP 200과 `{ "records": [{ "id": "UUID", "nickname": "민수", "score": 450, "level": 1, "createdAt": "ISO-8601 문자열" }] }`를 반환한다. `records`는 0~5개다.
-- SQL 정렬은 `score DESC, created_at ASC`이며 최대 5개만 조회한다.
-- DB 오류는 HTTP 503과 `{ "success": false, "error": "LEADERBOARD_UNAVAILABLE" }`를 반환한다.
+#### 2. `GET /api/scores/top5`
+- 동작: `ensureTableExists()` 호출 후 `SELECT id, nickname, score, level, created_at FROM game_scores ORDER BY score DESC, created_at ASC LIMIT 5` 실행
+- 성공 응답: HTTP 200 `{ "records": [...] }` (0~5개 배열)
+- DB 장애: HTTP 503 `{ "success": false, "error": "LEADERBOARD_UNAVAILABLE" }`
 
 ## 2. 기술 스택과 폴더 구조
 
 ### 기술 구성
-- Next.js App Router, React, TypeScript, Tailwind CSS를 사용한다.
-- 서버 측 점수 저장과 조회에는 Neon PostgreSQL 및 `@neondatabase/serverless`를 사용한다.
-- 게임 진행은 브라우저에서 동작한다. 점수 API와 DB 연결 코드는 서버에서만 실행한다.
-- GitHub에 코드를 저장하고 Vercel에서 빌드·배포한다.
+- Next.js App Router, React, TypeScript, Tailwind CSS
+- 데이터베이스: Neon PostgreSQL 단독 사용 (Supabase 완전 배제)
+- DB 클라이언트: `@neondatabase/serverless`
+- 배포 환경: GitHub + Vercel
 
 ### 폴더와 파일
 ```text
@@ -70,40 +73,37 @@ cup-shuffle-game/
 ├── app/
 │   ├── api/
 │   │   └── scores/
-│   │       ├── route.ts              # POST 점수 저장
+│   │       ├── route.ts              # POST 점수 저장 (테이블 자동 확인 포함)
 │   │       └── top5/
-│   │           └── route.ts          # GET TOP 5 조회
-│   ├── globals.css                   # 전역 스타일과 Tailwind
-│   ├── layout.tsx                    # HTML 기본 레이아웃과 메타데이터
-│   └── page.tsx                      # 공개 게임 페이지
+│   │           └── route.ts          # GET TOP 5 조회 (테이블 자동 확인 포함)
+│   ├── globals.css                   # 전역 스타일 및 애니메이션
+│   ├── layout.tsx                    # 기본 레이아웃 및 뷰포트 메타태그
+│   └── page.tsx                      # 게임 단일 페이지 (클라이언트 컴포넌트)
 ├── components/
-│   ├── CupItem.tsx                   # 동일 스타일 컵과 슬롯 이동
-│   ├── GameBoard.tsx                 # 게임 상태, 보드, 컵 선택
-│   ├── GameOverModal.tsx             # 종료·점수 저장 UI
-│   ├── Header.tsx                    # 제목, 점수, 최고 점수, 랭킹 버튼
-│   └── LeaderboardModal.tsx          # TOP 5 조회와 결과 표시
+│   ├── CupItem.tsx                   # 동일한 흰색 카드 스타일 및 슬롯 이동
+│   ├── GameBoard.tsx                 # 게임 진행, 섞기 애니메이션 제어
+│   ├── GameOverModal.tsx             # 종료 및 점수 등록 모달
+│   ├── Header.tsx                    # 점수/레벨/최고점수 표시, 랭킹 버튼
+│   └── LeaderboardModal.tsx          # 온라인 TOP 5 랭킹 모달
 ├── constants/
-│   └── levels.ts                     # 레벨별 컵 수와 이동 규칙
+│   └── levels.ts                     # 레벨별 컵 수, 속도, 섞기 횟수
 ├── lib/
-│   ├── db.ts                         # 서버 전용 Neon 연결
-│   └── scores.ts                     # 서버 전용 점수 조회·저장
+│   ├── db.ts                         # Neon serverless 클라이언트 및 ensureTableExists() 구현
+│   └── scores.ts                     # 점수 등록 및 랭킹 조회 서버 함수
 ├── types/
-│   └── game.ts                       # 게임 상태, 레벨, API 응답 타입
+│   └── game.ts                       # 상태, 점수, 레벨 타입 정의
 ├── utils/
-│   ├── game.ts                       # 섞기 순서와 점수 계산
-│   └── storage.ts                    # 최고 점수 읽기·쓰기
-├── .env.example                      # 환경 변수 이름만 포함
+│   ├── game.ts                       # 셔플 알고리즘 및 점수 계산 유틸
+│   └── storage.ts                    # localStorage 최고 점수 헬퍼
+├── .env.example                      # DATABASE_URL= 만 명시
 ├── next.config.mjs
 ├── package.json
 ├── tailwind.config.ts
 └── tsconfig.json
 ```
 
-### 환경 변수와 보안
-- 서버 환경 변수 이름은 `DATABASE_URL` 하나다. Neon의 PostgreSQL 연결 문자열을 `.env.local` 또는 Vercel 프로젝트의 서버 환경 변수에 설정한다.
-- `.env.example`에는 `DATABASE_URL=` 이름만 적고 실제 연결 문자열을 커밋하지 않는다.
-- `DATABASE_URL`을 `NEXT_PUBLIC_` 접두사가 붙은 변수로 만들거나 브라우저 코드에서 읽지 않는다.
-- `.env.local`을 Git에 커밋하지 않는다. Neon 연결 또는 쿼리 오류의 상세 메시지와 연결 문자열은 API 응답에 포함하지 않는다.
+### 자동 테이블 확인 로직 (`lib/db.ts`)
+- 서버 인스턴스 실행 중 1회 이상 검사 플래그를 캐싱하거나, API 핸들러 호출 시 `CREATE TABLE IF NOT EXISTS` 및 `CREATE INDEX IF NOT EXISTS` DDL을 트랜잭션/단일 호출로 실행하여 테이블 미존재로 인한 런타임 오류를 원천 차단한다.
 
 ## 3. 품질 기준 (성능·보안·접근성)
 
@@ -130,6 +130,8 @@ cup-shuffle-game/
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v29 | 2026. 10. 30. 15시 26분 32초 | 최종 감수: 최종 감수를 마쳐 모든 요구사항, 데이터 모델, 폴더 구조 및 테스트 기준의 정합성을 검증하고 개발 준비 완료(ready=true) 상태로 변경했습니다. |
+| v28 | 2026. 10. 30. 15시 14분 32초 | Supabase 관련 언급을 전면 제거하고 Neon PostgreSQL 단독 사용 및 서비스 구동/API 호출 시 테이블 자동 확인·생성(Auto-migration) 로직을 명세에 반영했습니다. |
 | v27 | 2026. 10. 30. 12시 5분 35초 | 최종 감수: 최종 감수 완료: 전 섹션의 요구사항 모순 검증, Neon DB 설정 및 환경변수 일치, 컵 이동 애니메이션·모바일 해상도 대응 규격 최종 확정 |
 | v26 | 2026. 10. 30. 11시 58분 50초 | 최종 감수: 컵 카드 색상 통일을 유지하면서 게임 진행·점수·랭킹·DB·배포 명세의 모호함과 불일치를 정리해 구현 가능한 최종 문서로 확정했습니다. |
 | v25 | 2026. 10. 30. 11시 52분 40초 | Supabase에서 Neon PostgreSQL로의 DB 전환 확정 및 기존 데이터 이전을 위한 마이그레이션 절차와 스크립트 명세 추가 |

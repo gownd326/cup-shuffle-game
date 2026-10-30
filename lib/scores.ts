@@ -1,34 +1,15 @@
-import { getDbClient } from '@/lib/db';
+import { ensureTableExists } from '@/lib/db';
 import { ScoreRecord } from '@/types/game';
 
-// In-memory fallback repository when DATABASE_URL is not configured
+// In-memory fallback repository when DATABASE_URL is not configured or during local test without DB
 const memoryScores: ScoreRecord[] = [];
-
-/**
- * game_scores 테이블 존재 여부 보장 (최초 쿼리 시)
- */
-async function ensureScoresTable(sql: ReturnType<typeof getDbClient>) {
-  if (!sql) return;
-  await sql`
-    CREATE TABLE IF NOT EXISTS game_scores (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      nickname VARCHAR(8) NOT NULL CHECK (char_length(nickname) BETWEEN 2 AND 8),
-      score INTEGER NOT NULL CHECK (score >= 0),
-      level INTEGER NOT NULL CHECK (level >= 1),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE INDEX IF NOT EXISTS idx_game_scores_ranking
-      ON game_scores (score DESC, created_at ASC);
-  `;
-}
 
 /**
  * TOP 5 기록 조회 (score DESC, created_at ASC)
  */
 export async function getTop5Scores(): Promise<ScoreRecord[]> {
-  const sql = getDbClient();
+  const sql = await ensureTableExists();
   if (sql) {
-    await ensureScoresTable(sql);
     const rows = await sql`
       SELECT id, nickname, score, level, created_at
       FROM game_scores
@@ -72,9 +53,8 @@ export async function saveScore(
     throw new Error('INVALID_INPUT');
   }
 
-  const sql = getDbClient();
+  const sql = await ensureTableExists();
   if (sql) {
-    await ensureScoresTable(sql);
     const rows = await sql`
       INSERT INTO game_scores (nickname, score, level)
       VALUES (${trimmed}, ${score}, ${level})

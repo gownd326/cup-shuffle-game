@@ -24,7 +24,7 @@ npm install
 ```env
 DATABASE_URL=postgres://username:password@ep-sample-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 ```
-*(환경 변수를 설정하지 않아도 브라우저 메모리 기반으로 랭킹과 게임이 정상 동작하도록 안전하게 제작되었습니다!)*
+*(환경 변수를 설정하지 않아도 브라우저 메모리 기반으로 랭킹과 게임이 정상 동작하도록 안전하게 제작되었습니다! 배포 시 첫 API 접근 시 `game_scores` 테이블과 인덱스가 서버에서 자동 생성됩니다.)*
 
 ### 4. 게임 실행하기
 ```bash
@@ -38,7 +38,7 @@ npm run dev
 
 ## 🧪 자동화 테스트 실행 방법
 
-개발 명세서(SPEC v27)의 모든 기능 수용 테스트를 실행하려면 아래 명령어를 입력하세요:
+개발 명세서(SPEC v29)의 모든 기능 수용 테스트를 실행하려면 아래 명령어를 입력하세요:
 
 ```bash
 npm test
