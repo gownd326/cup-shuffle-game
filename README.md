@@ -1,8 +1,8 @@
-# 도전! 컵 섞기 야바위 게임 🥤 (Cup Shuffle Game)
+# 도전! 컵 섞기 야바위 게임 🥤 (cup-shuffle-game)
 
-웹 브라우저에서 바로 즐길 수 있는 온라인 야바위 미니게임입니다.  
-완전히 동일한 순백색 컵 카드 아래 숨겨진 붉은 공의 궤적을 눈으로 집중하여 추적하세요!  
-레벨이 올라갈수록 컵의 개수와 섞는 속도가 빨라지며, 게임 오버 시 닉네임을 등록하여 전 세계 플레이어들과 실시간 **TOP 5 명예의 전당** 랭킹을 경쟁할 수 있습니다.
+브라우저에서 컵의 이동을 눈으로 따라가 공이 숨겨진 컵을 찾는 야바위 게임입니다.  
+모든 컵 카드는 동일한 불투명 순백색과 핑크 테두리를 사용하며, 레벨이 올라갈수록 컵 수와 교환 횟수가 증가합니다.  
+게임 종료 후 점수를 Neon PostgreSQL에 저장하고 전체 플레이어의 TOP 5 랭킹을 확인할 수 있습니다.
 
 ---
 
@@ -20,7 +20,7 @@ npm install
 ```
 
 ### 3. 데이터베이스 환경 변수 설정 (선택 사항)
-실제 Neon PostgreSQL 데이터베이스에 영구 저장하려면 `.env.example` 파일을 복사하여 `.env.local` 파일을 만들고 Neon 연결 문자열(`DATABASE_URL`)을 입력합니다:
+실제 Neon PostgreSQL 데이터베이스에 점수를 저장하려면 프로젝트 루트에 `.env.local` 파일을 생성하고 연결 문자열을 입력합니다:
 ```env
 DATABASE_URL=postgres://username:password@ep-sample-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 ```
@@ -38,7 +38,7 @@ npm run dev
 
 ## 🧪 자동화 테스트 실행 방법
 
-개발 명세서(SPEC v24)의 모든 수용 기준과 품질 테스트를 실행하려면 아래 명령어를 입력하세요:
+개발 명세서(SPEC v27)의 모든 기능 수용 테스트를 실행하려면 아래 명령어를 입력하세요:
 
 ```bash
 npm test

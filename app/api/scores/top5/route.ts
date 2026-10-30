@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
-import { fetchTop5Records } from '@/lib/db';
+import { getTop5Scores } from '@/lib/scores';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const scores = await fetchTop5Records();
-    return NextResponse.json(scores, { status: 200 });
-  } catch (error) {
-    console.error('Failed to get top 5 scores:', error);
+    const records = await getTop5Scores();
+    return NextResponse.json({ records }, { status: 200 });
+  } catch (err) {
+    console.error('Failed to fetch top 5 records:', err);
     return NextResponse.json(
-      { error: '실시간 랭킹을 불러오지 못했습니다.' },
-      { status: 500 }
+      { success: false, error: 'LEADERBOARD_UNAVAILABLE' },
+      { status: 503 }
     );
   }
 }

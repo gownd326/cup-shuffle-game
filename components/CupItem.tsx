@@ -1,11 +1,11 @@
 import React from 'react';
 import { CupItemData, GameState } from '@/types/game';
-import Ball from './Ball';
 
 interface CupItemProps {
   cup: CupItemData;
   slotWidth: number;
   cupWidth: number;
+  cupHeight: number;
   swapDuration: number;
   gameState: GameState;
   hasBall: boolean;
@@ -15,15 +15,18 @@ interface CupItemProps {
 
 /**
  * CupItem Component
- * - SPEC: 모든 카드가 완전히 동일한 100% 단일 화이트 색상 (bg-white opacity-100 border-2 border-pink-200 rounded-2xl shadow-md)
- * - z-index: 20 (컵 카드가 공 그래픽 z-10보다 항상 위에 위치)
- * - liftY: PREVIEW -> -50px, REVEAL/CHOOSING selection open -> -40px
- * - Ball은 hasBall이고 isOpen일 때만 표시(PREVIEW 및 REVEAL/ROUND_CLEAR/GAME_OVER)
+ * - SPEC:
+ *   모든 컵 카드는 배경 #FFFFFF, 불투명도 1, 테두리 2px solid #FBCFE8, 모서리 둥글기 16px, 동일한 그림자
+ *   카드 위치나 순서에 따라 외관을 바꾸지 않는다.
+ *   공은 MIXING과 CHOOSING에서는 DOM에 렌더링하지 않는다.
+ *   PREVIEW에서만 정답 컵을 위로 50px 들어 올리고 공을 표시한다.
+ *   REVEAL, ROUND_CLEAR, GAME_OVER에서는 결과 확인에 필요한 공을 표시한다.
  */
 export default function CupItem({
   cup,
   slotWidth,
   cupWidth,
+  cupHeight,
   swapDuration,
   gameState,
   hasBall,
@@ -37,20 +40,17 @@ export default function CupItem({
   const x = cup.slotIndex * slotWidth;
   const y = cup.yOffset;
 
-  // Lift distance: PREVIEW -> -50px, REVEAL / Open -> -40px per SPEC
+  // Lift distance: PREVIEW -> -50px, REVEAL/Open -> -40px
   const liftY = isOpen ? (gameState === 'PREVIEW' ? -50 : -40) : 0;
 
-  // Ball visibility rule per SPEC 3.1:
-  // MIXING and CHOOSING -> ball must be strictly hidden (no faint visibility)
-  const isBallRevealed =
+  // 공 렌더링 여부: MIXING과 CHOOSING에서는 DOM에 렌더링하지 않는다!
+  const shouldRenderBall =
     hasBall &&
     isOpen &&
     (gameState === 'PREVIEW' ||
       gameState === 'REVEAL' ||
       gameState === 'ROUND_CLEAR' ||
       gameState === 'GAME_OVER');
-
-  const cupHeight = Math.round(cupWidth * 1.35); // responsive aspect ratio
 
   return (
     <div
@@ -70,7 +70,7 @@ export default function CupItem({
         isMixing ? 'pointer-events-none' : 'pointer-events-auto'
       }`}
     >
-      {/* Floor Slot Marker */}
+      {/* 슬롯 바닥 표시선 */}
       <div className="absolute bottom-2 w-full flex items-center justify-center pointer-events-none z-0">
         <div
           style={{ width: `${Math.max(28, cupWidth - 14)}px` }}
@@ -78,8 +78,17 @@ export default function CupItem({
         />
       </div>
 
-      {/* Ball Element at z-10 bottom-4 per SPEC */}
-      <Ball isRevealed={isBallRevealed} />
+      {/* 공: MIXING, CHOOSING 에서는 아예 DOM에 렌더링하지 않음 */}
+      {shouldRenderBall && (
+        <div
+          data-testid="ball"
+          aria-label="숨겨진 공"
+          className="absolute z-10 bottom-4 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#EF4444] shadow-inner flex items-center justify-center transition-all duration-200"
+        >
+          {/* Gloss Highlight */}
+          <div className="w-2 h-2 rounded-full bg-white/70 -mt-2 -ml-2" />
+        </div>
+      )}
 
       {/* 컵 카드 본체: z-index 20 */}
       <div
@@ -88,7 +97,7 @@ export default function CupItem({
           transition: 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
           zIndex: 20,
         }}
-        className="relative flex flex-col items-center cursor-pointer mb-2"
+        className="relative flex flex-col items-center mb-2"
       >
         <button
           type="button"
@@ -99,10 +108,12 @@ export default function CupItem({
           style={{
             width: `${cupWidth}px`,
             height: `${cupHeight}px`,
-            backgroundColor: 'rgb(255, 255, 255)',
+            backgroundColor: '#FFFFFF',
             opacity: 1,
+            border: '2px solid #FBCFE8',
+            borderRadius: '16px',
           }}
-          className="bg-white opacity-100 border-2 border-pink-200 rounded-2xl shadow-md flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-pink-300 active:scale-95 disabled:cursor-default"
+          className="shadow-md flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-pink-300 active:scale-95 disabled:cursor-default"
         >
           <span className="text-2xl sm:text-4xl select-none filter drop-shadow-sm">
             🥤

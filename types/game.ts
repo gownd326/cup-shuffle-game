@@ -10,8 +10,8 @@ export type GameState =
 export interface CupItemData {
   id: string; // 'cup-0', 'cup-1', ...
   slotIndex: number; // 0 ~ N-1
-  yOffset: number; // -30, 30, or 0
-  zIndex: number; // 10, 20, 30
+  yOffset: number; // arch offset
+  zIndex: number;
 }
 
 export interface LevelConfig {
@@ -30,5 +30,17 @@ export interface ScoreRecord {
   nickname: string;
   score: number;
   level: number;
-  created_at: string;
+  createdAt: string;
+}
+
+export interface ApiScoreResponse {
+  success: boolean;
+  record?: ScoreRecord;
+  error?: string;
+}
+
+export interface ApiTop5Response {
+  success?: boolean;
+  records?: ScoreRecord[];
+  error?: string;
 }

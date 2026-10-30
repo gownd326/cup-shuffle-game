@@ -34,15 +34,15 @@ export default function LeaderboardModal({
     );
   };
 
+  // 날짜는 브라우저 현지 시간대로 YYYY.MM.DD 형식으로 표시한다.
   const formatDate = (isoString: string) => {
     try {
       const d = new Date(isoString);
       if (isNaN(d.getTime())) return '-';
-      const m = d.getMonth() + 1;
-      const day = d.getDate();
-      const h = String(d.getHours()).padStart(2, '0');
-      const min = String(d.getMinutes()).padStart(2, '0');
-      return `${m}/${day} ${h}:${min}`;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}.${month}.${day}`;
     } catch {
       return '-';
     }
@@ -55,7 +55,7 @@ export default function LeaderboardModal({
       aria-labelledby="leaderboard-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
     >
-      <div className="bg-white/95 backdrop-blur-md border border-pink-100 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl transform transition-all relative">
+      <div className="bg-[#FFFFFF]/95 backdrop-blur-md border border-pink-100 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl transform transition-all relative">
         {/* Close Button */}
         <button
           type="button"
@@ -72,18 +72,15 @@ export default function LeaderboardModal({
             id="leaderboard-title"
             className="text-2xl sm:text-3xl font-extrabold text-pink-500 flex items-center justify-center gap-2"
           >
-            🏆 실시간 명예의 전당 TOP 5
+            🏆 TOP 5 랭킹
           </h2>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            전 세계 플레이어들의 최고 점수 기록입니다!
-          </p>
         </div>
 
         {/* Content */}
         {isLoading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-3">
             <div className="w-8 h-8 border-4 border-pink-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-slate-500 text-sm">실시간 랭킹을 불러오는 중...</p>
+            <p className="text-slate-500 text-sm">랭킹을 불러오는 중...</p>
           </div>
         ) : error ? (
           <div className="py-8 text-center space-y-4">
@@ -91,7 +88,7 @@ export default function LeaderboardModal({
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1.5 bg-pink-400 hover:bg-pink-500 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 bg-[#F472B6] hover:bg-[#EC4899] text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
               <span>다시 시도</span>
@@ -99,7 +96,7 @@ export default function LeaderboardModal({
           </div>
         ) : scores.length === 0 ? (
           <div className="py-8 text-center text-slate-500 text-sm">
-            아직 등록된 랭킹 기록이 없습니다. 첫 번째 챔피언에 도전해보세요!
+            아직 등록된 점수가 없습니다.
           </div>
         ) : (
           <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
@@ -134,7 +131,7 @@ export default function LeaderboardModal({
                         )}
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        {formatDate(record.created_at)}
+                        {formatDate(record.createdAt)}
                       </div>
                     </div>
                   </div>

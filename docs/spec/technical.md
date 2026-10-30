@@ -1,6 +1,6 @@
 # 컵 섞기 야바위 게임 — 기술·데이터 설계
 
-> 문서 버전 v24 · 완성도 100% · 마지막 수정 2026. 10. 30. 10시 22분 39초
+> 문서 버전 v27 · 완성도 100% · 마지막 수정 2026. 10. 30. 14시 38분 59초
 > 이 문서만 보고 AI(또는 개발자)가 개발해도 거의 같은 결과가 나오도록 작성되었습니다.
 
 ## 기본 정보
@@ -15,105 +15,124 @@
 
 ## 1. 데이터 모델
 
-### 1. 데이터베이스 스키마 (Neon PostgreSQL)
-- **테이블명**: `game_scores`
-- **컬럼 정의**:
+### Neon PostgreSQL 테이블
+모든 점수 기록은 Neon PostgreSQL의 `game_scores` 테이블에 저장한다. 테이블 변경은 서버에서 실행할 SQL 스키마로 관리한다.
 
-| 컬럼명 | 데이터 타입 | 제약 조건 | 설명 |
-| :--- | :--- | :--- | :--- |
-| `id` | `UUID` | PRIMARY KEY DEFAULT gen_random_uuid() | 고유 식별자 |
-| `nickname` | `VARCHAR(8)` | NOT NULL, CHECK (char_length(nickname) >= 2) | 플레이어 닉네임 (2~8자) |
-| `score` | `INTEGER` | NOT NULL, CHECK (score >= 0) | 최종 획득 점수 |
-| `level` | `INTEGER` | NOT NULL DEFAULT 1 | 도달한 최종 레벨 |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() | 점수 기록 일시 |
+| 필드 | PostgreSQL 타입 | 제약 | 설명 |
+| --- | --- | --- | --- |
+| `id` | `UUID` | 기본 키, 기본값 `gen_random_uuid()` | 기록 ID |
+| `nickname` | `VARCHAR(8)` | 필수, 길이 2~8자 | 저장 시 앞뒤 공백을 제거한 닉네임 |
+| `score` | `INTEGER` | 필수, 0 이상 | 게임 최종 점수 |
+| `level` | `INTEGER` | 필수, 1 이상 | 게임 종료 시 도달한 레벨 |
+| `created_at` | `TIMESTAMPTZ` | 필수, 기본값 `NOW()` | 저장 시각 |
 
-- **테이블 생성 DDL**:
 ```sql
 CREATE TABLE IF NOT EXISTS game_scores (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nickname VARCHAR(8) NOT NULL CHECK (char_length(nickname) >= 2),
+  nickname VARCHAR(8) NOT NULL CHECK (char_length(nickname) BETWEEN 2 AND 8),
   score INTEGER NOT NULL CHECK (score >= 0),
-  level INTEGER NOT NULL DEFAULT 1,
+  level INTEGER NOT NULL CHECK (level >= 1),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_game_scores_ranking ON game_scores (score DESC, created_at ASC);
+
+CREATE INDEX IF NOT EXISTS idx_game_scores_ranking
+  ON game_scores (score DESC, created_at ASC);
 ```
 
-### 2. 서버 API 엔드포인트
-- `GET /api/scores/top5`:
-  - 상위 5개 레코드 반환 (`SELECT nickname, score, level, created_at FROM game_scores ORDER BY score DESC, created_at ASC LIMIT 5;`)
-- `POST /api/scores`:
-  - 바디: `{ nickname: string, score: number, level: number }`
-  - 서버 유효성 검사: 닉네임 길이(2~8자), score 0 이상 정수 확인 후 DB INSERT.
-  - 응답: `{ success: true, record: { id, nickname, score, level } }`
+- 서버는 `@neondatabase/serverless`로 DB에 접근한다. DB 쿼리는 API 라우트에서만 실행한다.
+- 개인 최고 점수는 서버 DB가 아니라 브라우저 `localStorage`의 `cup-shuffle-best-score` 키에 저장한다. 이 값은 랭킹 기록과 별개다.
+- Supabase 데이터를 자동으로 이전하는 기능은 이번 구현 범위에 포함하지 않는다. 기존 DB 자격 증명과 데이터 내보내기 파일이 제공되지 않았으므로, 기존 데이터 이전은 별도 운영 작업이다.
+
+### API 계약
+#### `POST /api/scores`
+- 요청 JSON: `{ "nickname": "민수", "score": 450, "level": 1 }`
+- 서버는 JSON 형식, 닉네임의 앞뒤 공백 제거 후 길이 2~8자, `score`의 0 이상 정수, `level`의 1 이상 정수를 검사한다.
+- 성공 시 HTTP 201과 `{ "success": true, "record": { "id": "UUID", "nickname": "민수", "score": 450, "level": 1, "createdAt": "ISO-8601 문자열" } }`를 반환한다.
+- 유효하지 않은 입력은 HTTP 400과 `{ "success": false, "error": "INVALID_INPUT" }`를 반환한다. DB 오류는 상세 정보를 노출하지 않고 HTTP 503과 `{ "success": false, "error": "SAVE_FAILED" }`를 반환한다.
+- 닉네임과 점수는 준비된 쿼리 매개변수로 전달한다. 클라이언트 검증만 신뢰하지 않는다.
+
+#### `GET /api/scores/top5`
+- 성공 시 HTTP 200과 `{ "records": [{ "id": "UUID", "nickname": "민수", "score": 450, "level": 1, "createdAt": "ISO-8601 문자열" }] }`를 반환한다. `records`는 0~5개다.
+- SQL 정렬은 `score DESC, created_at ASC`이며 최대 5개만 조회한다.
+- DB 오류는 HTTP 503과 `{ "success": false, "error": "LEADERBOARD_UNAVAILABLE" }`를 반환한다.
 
 ## 2. 기술 스택과 폴더 구조
 
-### 1. 기술 스택
-- 프레임워크: Next.js (App Router, React 18, TypeScript)
-- 스타일링: Tailwind CSS
-- 데이터베이스: Neon PostgreSQL (`@neondatabase/serverless` 드라이버 사용)
-- 오디오: Web Audio API (`AudioContext` 기반 브라우저 내장 오실레이터 비프음/클릭음 구현)
-- 아이콘: Lucide React (`Trophy`, `Play`, `RotateCcw`, `Check`, `Award`)
+### 기술 구성
+- Next.js App Router, React, TypeScript, Tailwind CSS를 사용한다.
+- 서버 측 점수 저장과 조회에는 Neon PostgreSQL 및 `@neondatabase/serverless`를 사용한다.
+- 게임 진행은 브라우저에서 동작한다. 점수 API와 DB 연결 코드는 서버에서만 실행한다.
+- GitHub에 코드를 저장하고 Vercel에서 빌드·배포한다.
 
-### 2. 프로젝트 디렉토리 및 파일 트리
+### 폴더와 파일
 ```text
 cup-shuffle-game/
 ├── app/
-│   ├── layout.tsx              # 전역 폰트 및 메타데이터
-│   ├── page.tsx                # 메인 게임 단일 페이지
-│   └── api/
-│       └── scores/
-│           ├── route.ts        # POST: 점수 저장 처리
-│           └── top5/
-│               └── route.ts    # GET: 상위 5명 점수 조회
+│   ├── api/
+│   │   └── scores/
+│   │       ├── route.ts              # POST 점수 저장
+│   │       └── top5/
+│   │           └── route.ts          # GET TOP 5 조회
+│   ├── globals.css                   # 전역 스타일과 Tailwind
+│   ├── layout.tsx                    # HTML 기본 레이아웃과 메타데이터
+│   └── page.tsx                      # 공개 게임 페이지
 ├── components/
-│   ├── Header.tsx              # 점수판, 최고점수, 레벨 및 랭킹 모달 버튼
-│   ├── StatusAlert.tsx         # 상황별 안내 말풍선
-│   ├── GameBoard.tsx           # 컵 슬롯 좌표 계산 및 translateX 애니메이션 제어
-│   ├── CupItem.tsx             # 모든 컵에 동일한 외관을 적용하는 카드 컴포넌트
-│   ├── Ball.tsx                # 붉은색 공 컴포넌트 (표시/은폐 제어)
-│   ├── GameOverModal.tsx       # 점수 저장(1회 제한) 및 재도전 모달
-│   └── LeaderboardModal.tsx    # 실시간 TOP 5 리더보드 모달
-├── lib/
-│   └── db.ts                   # Neon serverless pool/sql 클라이언트 인스턴스
-├── types/
-│   └── game.ts                 # GameState, CupItemType, LevelConfig, ScoreRecord 타입 정의
+│   ├── CupItem.tsx                   # 동일 스타일 컵과 슬롯 이동
+│   ├── GameBoard.tsx                 # 게임 상태, 보드, 컵 선택
+│   ├── GameOverModal.tsx             # 종료·점수 저장 UI
+│   ├── Header.tsx                    # 제목, 점수, 최고 점수, 랭킹 버튼
+│   └── LeaderboardModal.tsx          # TOP 5 조회와 결과 표시
 ├── constants/
-│   └── levels.ts               # 레벨별 속도(duration), 컵 개수(cupCount), 교환 횟수(shuffleCount)
+│   └── levels.ts                     # 레벨별 컵 수와 이동 규칙
+├── lib/
+│   ├── db.ts                         # 서버 전용 Neon 연결
+│   └── scores.ts                     # 서버 전용 점수 조회·저장
+├── types/
+│   └── game.ts                       # 게임 상태, 레벨, API 응답 타입
 ├── utils/
-│   ├── sound.ts                # Web Audio API 톤 생성기 (정답 징글, 실패 톤, 이동음)
-│   └── timer.ts                # 비동기 딜레이 sleep 유틸리티
-├── .env.example
+│   ├── game.ts                       # 섞기 순서와 점수 계산
+│   └── storage.ts                    # 최고 점수 읽기·쓰기
+├── .env.example                      # 환경 변수 이름만 포함
 ├── next.config.mjs
+├── package.json
 ├── tailwind.config.ts
-├── tsconfig.json
-└── package.json
+└── tsconfig.json
 ```
 
-### 3. 환경 변수 설정
-- 서버 전용 환경 변수 (`.env.local`):
-  - `DATABASE_URL`: Neon PostgreSQL 연결 문자열 (클라이언트에 노출되지 않음)
+### 환경 변수와 보안
+- 서버 환경 변수 이름은 `DATABASE_URL` 하나다. Neon의 PostgreSQL 연결 문자열을 `.env.local` 또는 Vercel 프로젝트의 서버 환경 변수에 설정한다.
+- `.env.example`에는 `DATABASE_URL=` 이름만 적고 실제 연결 문자열을 커밋하지 않는다.
+- `DATABASE_URL`을 `NEXT_PUBLIC_` 접두사가 붙은 변수로 만들거나 브라우저 코드에서 읽지 않는다.
+- `.env.local`을 Git에 커밋하지 않는다. Neon 연결 또는 쿼리 오류의 상세 메시지와 연결 문자열은 API 응답에 포함하지 않는다.
 
 ## 3. 품질 기준 (성능·보안·접근성)
 
-### 1. 공 은폐 및 투과 방지 품질 기준
-- **시각적 비침 차단**: 컵 카드의 배경색을 알파 채널이 없는 완전한 불투명 백색(`bg-white`, `#FFFFFF`)으로 설정하고, `MIXING` 및 `CHOOSING` 상태에서는 공 요소를 DOM에서 가상으로 숨기거나 `opacity: 0; visibility: hidden;` 처리하여 어떠한 환경(고대비 모니터, OLED 디스플레이)에서도 공의 위치가 투과되어 보이지 않도록 함.
-- **렌더링 순서 (z-index) 보장**: 컵 카드(`z-index: 20`) > 공(`z-index: 10`) > 배경 레일(`z-index: 0`).
+### 보안과 오류 처리
+- DB 연결은 서버 코드에서만 수행한다. 클라이언트에 `DATABASE_URL`이나 DB 오류 상세 정보를 보내지 않는다.
+- API는 입력 형식과 범위를 서버에서 검사하고, 닉네임은 준비된 쿼리 매개변수로 처리한다.
+- 로그인이나 사용자 인증은 없다. 따라서 요청 점수가 실제 게임 플레이에서 나온 점수인지 서버가 증명할 수 없다는 한계가 있다. API 입력 유효성 검사는 하되, 부정 점수 입력을 완전히 차단한다고 보장하지 않는다.
+- 점수 저장 또는 랭킹 조회가 실패하면 게임 화면을 멈추지 않는다. 안내 문구와 재시도를 제공하고, 사용자가 입력한 닉네임과 현재 게임 결과를 유지한다.
+- `localStorage` 접근이 불가능하거나 저장값이 손상된 경우 최고 점수를 0으로 사용하고 게임은 계속 진행한다.
 
-### 2. 크로스 디바이스 반응형 및 겹침 방지 품질 기준
-- **최소 지원 해상도**: 모바일 가로 320px(iPhone SE 등 구형 기기)부터 PC 와이드 모니터까지 지원.
-- **오버플로우 및 잘림 방지**: 보드 컨테이너에 `overflow-x-hidden` 및 동적 슬롯 계산(`slotWidth * cupCount <= containerWidth`)을 강제하여 가로 스크롤 발생이나 컵 요소의 잘림을 방지함.
-- **이동 궤적 보장**: 60fps 부드러운 이동을 위해 CSS `transform: translateX(...)` 및 `transition: transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)` 유지.
+### 화면과 조작 품질
+- 320px 너비부터 PC 와이드 화면까지 가로 스크롤, 컵 겹침, 컵 잘림이 없어야 한다.
+- 섞는 중에는 컵 선택을 막는다. 애니메이션 완료 이벤트가 누락되어도 이동 시간에 100ms를 더한 안전 타이머로 섞기를 계속한다.
+- 컵은 `transform`으로 실제 슬롯 사이를 이동해야 한다. DOM이 고정된 채 위치 변화 없이 애니메이션만 재생되는 구현은 허용하지 않는다.
+- 버튼과 컵 선택은 마우스와 터치에서 동작해야 한다. 컵은 키보드로도 선택할 수 있고, 버튼과 입력란에는 접근 가능한 이름을 지정한다.
+- 모션 감소 설정이 켜져 있으면 컵 이동 전환을 100ms로 줄인다.
 
-### 3. 상태 안전성
-- 섞는 도중(`MIXING`) 터치 및 클릭 차단 (`pointer-events: none`).
-- 점수 등록은 게임당 1회로 한정되며, 저장 직후 버튼 및 인풋이 즉시 비활성화됨.
+### 컵과 공의 시각적 정확성
+- 모든 컵의 계산된 배경색은 `rgb(255, 255, 255)`, 불투명도는 `1`이어야 한다.
+- 공은 `MIXING` 및 `CHOOSING` 상태에서 DOM에 없어야 한다. 이 상태에서 공의 위치를 컵 표면이나 투명 효과로 알아볼 수 없어야 한다.
+- 컵 요소의 z-index는 공보다 높게 유지한다. 결과 공개 상태에서만 공을 표시한다.
 
 ## 변경 이력
 
 | 버전 | 일시 | 변경 내용 |
 | --- | --- | --- |
+| v27 | 2026. 10. 30. 12시 5분 35초 | 최종 감수: 최종 감수 완료: 전 섹션의 요구사항 모순 검증, Neon DB 설정 및 환경변수 일치, 컵 이동 애니메이션·모바일 해상도 대응 규격 최종 확정 |
+| v26 | 2026. 10. 30. 11시 58분 50초 | 최종 감수: 컵 카드 색상 통일을 유지하면서 게임 진행·점수·랭킹·DB·배포 명세의 모호함과 불일치를 정리해 구현 가능한 최종 문서로 확정했습니다. |
+| v25 | 2026. 10. 30. 11시 52분 40초 | Supabase에서 Neon PostgreSQL로의 DB 전환 확정 및 기존 데이터 이전을 위한 마이그레이션 절차와 스크립트 명세 추가 |
 | v24 | 2026. 10. 30. 9시 11분 33초 | 최종 감수: Next.js App Router와 Neon PostgreSQL 기반으로 아키텍처를 정렬하고, 모든 컵 카드의 색상 동일화(단일 화이트) 및 공 비침 차단 규칙을 완벽히 동기화하여 개발 준비를 마쳤습니다. |
 | v23 | 2026. 10. 30. 8시 51분 41초 | 모바일 화면 컵 카드 겹침/잘림 방지를 위한 동적 반응형 슬롯 계산 적용 및 카드 100% 완전 불투명화와 공 노출 시점 제어 명시 |
 | v22 | 2026. 10. 29. 17시 0분 16초 | 최종 감수: 최종 감수 완료: 컵 카드 동일 색상 및 애니메이션 궤적 보장, Supabase 랭킹 중복 저장 방지, 모바일/PC 반응형 레이아웃 일관성 검증 및 개발 착수 준비 완료 |

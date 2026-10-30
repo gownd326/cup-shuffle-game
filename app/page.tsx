@@ -2,16 +2,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/Header';
-import StatusAlert from '@/components/StatusAlert';
 import GameBoard from '@/components/GameBoard';
 import GameOverModal from '@/components/GameOverModal';
 import LeaderboardModal from '@/components/LeaderboardModal';
-import { GameState, CupItemData, ScoreRecord } from '@/types/game';
-import { getLevelConfig, calculateRoundScore } from '@/constants/levels';
+import { GameState, CupItemData, ScoreRecord, ApiTop5Response } from '@/types/game';
+import { getLevelConfig } from '@/constants/levels';
+import { calculateRoundScore, pickTwoRandomSlots } from '@/utils/game';
+import { getStoredBestScore, saveStoredBestScore } from '@/utils/storage';
 import { playSound } from '@/utils/sound';
 import { sleep } from '@/utils/timer';
-
-const BEST_SCORE_STORAGE_KEY = 'cup_best_score';
 
 export default function HomePage() {
   const [gameState, setGameState] = useState<GameState>('IDLE');
@@ -37,25 +36,10 @@ export default function HomePage() {
   // Active run cancel guard
   const isPlayingRef = useRef<boolean>(false);
 
-  // Load top score on initial mount
+  // Load top score from localStorage on initial mount
   useEffect(() => {
-    const loadInitialTop = async () => {
-      try {
-        const res = await fetch('/api/scores/top5');
-        if (res.ok) {
-          const data: ScoreRecord[] = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setTopScore(data[0].score);
-            return;
-          }
-        }
-      } catch {
-        // ignore
-      }
-      const fallback = Number(localStorage.getItem(BEST_SCORE_STORAGE_KEY) || '0');
-      setTopScore(fallback);
-    };
-    loadInitialTop();
+    const stored = getStoredBestScore();
+    setTopScore(stored);
   }, []);
 
   // Fetch leaderboard data helper
@@ -65,19 +49,17 @@ export default function HomePage() {
     try {
       const res = await fetch('/api/scores/top5');
       if (!res.ok) {
-        throw new Error('랭킹을 불러오지 못했습니다.');
+        throw new Error('LEADERBOARD_UNAVAILABLE');
       }
-      const top5: ScoreRecord[] = await res.json();
-      setLeaderboardScores(top5);
-      if (top5.length > 0 && top5[0].score > topScore) {
-        setTopScore(top5[0].score);
-      }
+      const data: ApiTop5Response = await res.json();
+      const records = Array.isArray(data.records) ? data.records : [];
+      setLeaderboardScores(records);
     } catch {
-      setLeaderboardError('랭킹을 불러오지 못했습니다. 네트워크를 확인해주세요.');
+      setLeaderboardError('랭킹을 불러오지 못했어요. 다시 시도해 주세요.');
     } finally {
       setIsLoadingLeaderboard(false);
     }
-  }, [topScore]);
+  }, []);
 
   const handleOpenLeaderboard = () => {
     setIsLeaderboardOpen(true);
@@ -104,21 +86,16 @@ export default function HomePage() {
     setCups(createCupList(config.cups));
   }, [createCupList]);
 
-  // Pick two random slot indices for shuffle
-  const pickTwoRandomSlots = (count: number, lastPair: [number, number]): [number, number] => {
-    let a = Math.floor(Math.random() * count);
-    let b = Math.floor(Math.random() * count);
-    while (b === a || (count > 2 && a === lastPair[1] && b === lastPair[0])) {
-      b = Math.floor(Math.random() * count);
-    }
-    return [a, b];
-  };
-
   // Run the full round sequence: PREVIEW (1.5s ball visible) -> MIXING (ball hidden) -> CHOOSING (ball hidden)
   const runRound = useCallback(
     async (roundLevel: number) => {
       const config = getLevelConfig(roundLevel);
-      setCurrentSwapDuration(config.swapDuration);
+      // 움직임 줄이기 설정 확인
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const swapDuration = prefersReducedMotion ? 100 : config.swapDuration;
+      setCurrentSwapDuration(swapDuration);
 
       // Create initial cups and pick random ball cup
       const newCups = createCupList(config.cups);
@@ -127,7 +104,7 @@ export default function HomePage() {
 
       setCups(newCups);
       setBallCupId(chosenBallCupId);
-      // PREVIEW: 정답 컵 위로 들리고 공 1.5초간 노출
+      // PREVIEW: 정답 컵 위로 50px 들리고 공 1,500ms 동안 공개
       setRevealedCupIds([chosenBallCupId]);
       setGameState('PREVIEW');
       playSound('start');
@@ -135,9 +112,9 @@ export default function HomePage() {
       await sleep(1500);
       if (!isPlayingRef.current) return;
 
-      // Close cup and enter MIXING (공 완전히 은폐)
+      // Close cup and enter MIXING (공은 DOM에 렌더링되지 않음)
       setRevealedCupIds([]);
-      await sleep(300);
+      await sleep(250);
       if (!isPlayingRef.current) return;
 
       setGameState('MIXING');
@@ -149,7 +126,7 @@ export default function HomePage() {
         const [slotA, slotB] = pickTwoRandomSlots(config.cups, lastPair);
         lastPair = [slotA, slotB];
 
-        // 1. Swap slotIndex and apply arch yOffset
+        // 슬롯 교환
         setCups((prev) =>
           prev.map((c) => {
             if (c.slotIndex === slotA) {
@@ -163,10 +140,11 @@ export default function HomePage() {
         );
         playSound('shuffle');
 
-        await sleep(config.swapDuration);
+        // 이동 완료 대기 (이동시간 + 안전 여유 100ms 이내)
+        await sleep(swapDuration);
         if (!isPlayingRef.current) return;
 
-        // 2. Reset yOffsets back to 0px
+        // Reset yOffsets back to 0px
         setCups((prev) =>
           prev.map((c) => ({
             ...c,
@@ -175,11 +153,12 @@ export default function HomePage() {
           }))
         );
 
+        // 교환 사이 대기 시간
         await sleep(config.stepDelay);
         if (!isPlayingRef.current) return;
       }
 
-      // Mixing finished -> CHOOSING (공 여전히 은폐)
+      // 섞기가 모두 끝난 뒤 CHOOSING 전환
       setGameState('CHOOSING');
     },
     [createCupList]
@@ -190,7 +169,7 @@ export default function HomePage() {
     setLevel(1);
     setScore(0);
     setHighlightedRecordId(null);
-    setIsScoreSaved(false); // Reset saved flag on new game start
+    setIsScoreSaved(false);
     runRound(1);
   };
 
@@ -202,7 +181,7 @@ export default function HomePage() {
     const isCorrect = clickedCupId === ballCupId;
 
     if (isCorrect) {
-      // Correct! Open chosen cup
+      // 정답인 경우: 선택한 컵 열기
       setRevealedCupIds([clickedCupId]);
       playSound('correct');
 
@@ -213,17 +192,13 @@ export default function HomePage() {
 
       if (newScore > topScore) {
         setTopScore(newScore);
-        try {
-          localStorage.setItem(BEST_SCORE_STORAGE_KEY, newScore.toString());
-        } catch {
-          // ignore
-        }
+        saveStoredBestScore(newScore);
       }
 
       await sleep(350);
       setGameState('ROUND_CLEAR');
 
-      // 1.2s celebration then next level per SPEC
+      // 정답 점수를 더하고 1,200ms 뒤 다음 레벨을 시작한다
       await sleep(1200);
       if (!isPlayingRef.current) return;
 
@@ -231,7 +206,7 @@ export default function HomePage() {
       setLevel(nextLevel);
       runRound(nextLevel);
     } else {
-      // Incorrect! Reveal clicked cup & correct cup -> GAME_OVER
+      // 오답인 경우: 선택 컵과 정답 컵을 함께 연다
       setRevealedCupIds([clickedCupId, ballCupId]);
       playSound('incorrect');
 
@@ -241,11 +216,7 @@ export default function HomePage() {
 
       if (score > topScore) {
         setTopScore(score);
-        try {
-          localStorage.setItem(BEST_SCORE_STORAGE_KEY, score.toString());
-        } catch {
-          // ignore
-        }
+        saveStoredBestScore(score);
       }
     }
   };
@@ -261,26 +232,43 @@ export default function HomePage() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || '점수 저장에 실패했습니다.');
+        throw new Error('SAVE_FAILED');
       }
 
       const result = await res.json();
       if (result.record?.id) {
         setHighlightedRecordId(result.record.id);
       }
-      setIsScoreSaved(true); // Disable button & input immediately per SPEC
+      setIsScoreSaved(true);
 
-      // Refresh leaderboard & update top score
+      // Refresh leaderboard
       await loadLeaderboardData();
-      setIsLeaderboardOpen(true);
     } finally {
       setIsSavingScore(false);
     }
   };
 
+  // 상태별 안내 문구 (SPEC 4)
+  const getStatusMessage = () => {
+    switch (gameState) {
+      case 'IDLE':
+        return '게임을 시작하고 공이 숨겨진 컵을 찾아보세요!';
+      case 'PREVIEW':
+        return '공이 들어 있는 컵을 기억하세요!';
+      case 'MIXING':
+        return '컵을 잘 따라가세요!';
+      case 'CHOOSING':
+        return '공이 들어 있는 컵을 선택하세요.';
+      case 'ROUND_CLEAR':
+        return '정답이에요! 다음 레벨로 이동합니다.';
+      case 'GAME_OVER':
+      default:
+        return '아쉽네요! 게임이 끝났어요.';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-sky-100 flex flex-col justify-between items-center p-3 sm:p-4 select-none overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#FCE7F3] via-[#F3E8FF] to-[#E0F2FE] flex flex-col justify-between items-center px-3 sm:px-4 py-3 sm:py-4 select-none overflow-x-hidden">
       <Header
         score={score}
         topScore={topScore}
@@ -289,7 +277,16 @@ export default function HomePage() {
       />
 
       <main className="flex-1 w-full flex flex-col items-center justify-center my-auto px-2">
-        <StatusAlert gameState={gameState} />
+        {/* 안내 문구 (SPEC 4) */}
+        <div className="mb-3 sm:mb-5 flex items-center justify-center w-full px-2">
+          <div
+            role="status"
+            aria-live="polite"
+            className="bg-white/95 border border-pink-100 rounded-2xl px-4 sm:px-6 py-2 sm:py-2.5 text-pink-600 font-bold shadow-sm transition-all duration-300 text-center text-xs sm:text-sm"
+          >
+            {getStatusMessage()}
+          </div>
+        </div>
 
         <GameBoard
           level={level}
@@ -314,7 +311,7 @@ export default function HomePage() {
         onRestart={handleStartGame}
       />
 
-      {/* 실시간 명예의 전당 TOP 5 모달 */}
+      {/* TOP 5 랭킹 모달 */}
       <LeaderboardModal
         isOpen={isLeaderboardOpen}
         onClose={handleCloseLeaderboard}
